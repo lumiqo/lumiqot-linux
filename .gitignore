@@ -5,6 +5,14 @@
 *.md
 *.rst
 *.adoc
-/docs/
-/doc/
-/documents/
+*.pdf
+*.doc
+*.docx
+*.odt
+*.ppt
+*.pptx
+*.xls
+*.xlsx
+docs/
+doc/
+documents/
