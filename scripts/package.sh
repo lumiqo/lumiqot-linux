@@ -44,6 +44,13 @@ for arch in amd64 arm64; do
             fi
         done < "$build_dir/modules"
     )
+    mkdir -p "$package/licenses/go"
+    go_root=$(go env GOROOT)
+    if [[ -f "$go_root/LICENSE" ]]; then
+        cp -- "$go_root/LICENSE" "$go_root/PATENTS" "$package/licenses/go/"
+    else
+        cp -- "/usr/share/doc/golang-${go_root##*/go-}-go/copyright" "$package/licenses/go/"
+    fi
     install -m 0755 install.sh "$package/install.sh"
     tar -czf "$repo/dist/$name.tar.gz" -C "$build_dir" "$name"
 done
