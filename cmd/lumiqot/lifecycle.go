@@ -503,8 +503,9 @@ func startWorker(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if unit.load == "loaded" && unit.active != "active" {
-		// The previous candidate shares this unit's start-rate counter.
+	if unit.active == "failed" {
+		// A failed previous candidate shares this unit's start-rate counter.
+		// An inactive unit can be unloaded by systemd before reset-failed runs.
 		if _, err := systemctl(ctx, "reset-failed", "--", workerUnit); err != nil {
 			return err
 		}
