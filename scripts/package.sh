@@ -2,7 +2,7 @@
 set -euo pipefail
 export GOWORK=off
 
-if [[ $# != 5 || ! $1 =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+if [[ $# != 5 || ! $1 =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
     echo "Usage: scripts/package.sh VERSION WORKER_REPO WORKER_COMMIT ALLINO_REPO ALLINO_COMMIT" >&2
     exit 2
 fi
@@ -16,9 +16,26 @@ repo=$PWD
 mkdir -p dist
 build_dir=$(mktemp -d)
 trap 'rm -rf -- "$build_dir"' EXIT
-mkdir "$build_dir/worker" "$build_dir/allino"
+mkdir -p "$build_dir/worker/.deps/allino"
 git -C "$worker_repo" archive "$worker_commit" | tar -x -C "$build_dir/worker"
-git -C "$allino_repo" archive "$allino_commit" | tar -x -C "$build_dir/allino"
+git -C "$allino_repo" archive "$allino_commit" | tar -x -C "$build_dir/worker/.deps/allino"
+if [[ ! -f "$build_dir/worker/.deps/allino/job_queue.go" ]]; then
+    (cd "$build_dir/worker/.deps/allino" && patch -p1 < "$build_dir/worker/patches/allino-sql-queue.patch")
+fi
+
+# A disabled installation does not execute Worker during activation. Verify
+# that the selected source supports managed operation before creating releases.
+if ! worker_help=$(
+    cd "$build_dir/worker"
+    CGO_ENABLED=0 GOOS=linux GOARCH="$(go env GOHOSTARCH)" go run ./cmd/lumiqo-worker -help 2>&1
+); then
+    printf '%s\n' "$worker_help" >&2
+    exit 1
+fi
+if [[ $worker_help != *"-control-socket "* || $worker_help != *"-drain-marker "* ]]; then
+    echo "Worker commit $worker_commit does not support the managed control socket and drain marker" >&2
+    exit 1
+fi
 
 for arch in amd64 arm64; do
     name="lumiqot-linux-${version}-linux-${arch}"
@@ -51,8 +68,7 @@ for arch in amd64 arm64; do
     else
         cp -- "/usr/share/doc/golang-${go_root##*/go-}-go/copyright" "$package/licenses/go/"
     fi
-    install -m 0755 install.sh "$package/install.sh"
-    tar -czf "$repo/dist/$name.tar.gz" -C "$build_dir" "$name"
+    python3 scripts/archive.py "$package" "$version" "$arch" "$repo/dist/$name.tar.gz"
 done
 
 cd "$repo/dist"

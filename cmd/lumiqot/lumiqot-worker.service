@@ -1,0 +1,21 @@
+[Unit]
+Description=Lumiqot Worker
+After=network.target
+
+[Service]
+WorkingDirectory=%h
+RuntimeDirectory=lumiqot
+RuntimeDirectoryMode=0700
+RuntimeDirectoryPreserve=restart
+Environment=HOME=%h
+Environment=PATH=/opt/lumiqo/environment/current/bin:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecCondition=/opt/lumiqo/distribution/current/bin/lumiqot service check-enabled worker
+ExecStart=/opt/lumiqo/distribution/current/bin/lumiqot run-worker -mode poll "-config=%h/.config/lumiqo/worker.json" "-control-socket=%t/lumiqot/control.sock" "-drain-marker=%t/lumiqot/drained"
+KillMode=mixed
+SendSIGKILL=no
+TimeoutStopSec=infinity
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=default.target

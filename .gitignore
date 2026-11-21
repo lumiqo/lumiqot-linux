@@ -16,3 +16,6 @@
 docs/
 doc/
 documents/
+
+# Distribution and lifecycle reference
+!/README.md
