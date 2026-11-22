@@ -1,20 +1,21 @@
 # Lumiqot Linux distribution
 
-Build the Linux CLI and the bundled Worker from explicit Git commits. The Worker
-and Allino inputs can come from private repositories. The release contains
-binaries and dependency licenses.
+Build the Linux CLI with the bundled Worker and Gateway. Worker, Allino, and
+Gateway inputs come from explicit Git commits and can use private repositories.
+The release contains binaries and dependency licenses.
 
 ```sh
 go test ./...
-scripts/package.sh v1.2.3 /path/to/worker WORKER_COMMIT /path/to/allino ALLINO_COMMIT
+scripts/package.sh v1.2.3 /path/to/worker WORKER_COMMIT /path/to/allino ALLINO_COMMIT \
+    /path/to/gateway GATEWAY_COMMIT
 ```
 
-Build on Linux with Go 1.25 or newer, Python 3.11 or newer, Git, tar, and patch.
-The script archives both commits, builds for Linux amd64 and arm64, and
-generates two tarballs and a shared SHA256SUMS asset in `dist/`. Publish all
-three assets together in the stable GitHub release for that exact tag. Use a new
-tag for the first format 1 release. Manager installs the archive and owns
-the active symlink.
+Build on Linux with Go 1.26 or newer, Python 3.11 or newer, Git, tar, and patch.
+The script archives the three input commits, builds for Linux amd64 and arm64,
+and generates two tarballs and a shared SHA256SUMS asset in `dist/`. Publish all
+three assets together in the stable GitHub release for that exact tag. Manager installs the archive and owns
+the active symlink. The installed Gateway is available at
+`/opt/lumiqo/distribution/current/bin/lumiqo-gateway`. Gateway configuration is prepared separately from package installation.
 
 ## Package format 1
 
@@ -60,17 +61,20 @@ and extended attributes are ignored. Lifecycle protocol 2 is required by the mat
 ## Service management and lifecycle protocol 2
 
 Run these commands as the service user (`lumiqo`) in its systemd user
-session. The Worker is **disabled by default**, with or without an existing
-configuration. Manager can install a fresh release before the Worker is
-configured. Save a valid configuration and credentials, then explicitly
-enable the Worker.
+session. Worker and Gateway are **disabled by default**. Configure each service
+and its credentials before enabling it. The managed Gateway reads
+`$HOME/.config/lumiqo-gateway/gateway.yaml`, which you can create using the
+bundled Gateway's `init` command.
 
 | Command | Default deadline | Effect |
 | --- | --- | --- |
 | `lumiqot service enable worker` | 60 seconds | Save the enabled preference, start and verify the Worker, and resume admission. |
 | `lumiqot service disable worker` | 120 seconds | Save the disabled preference, drain in-flight work, and stop the Worker. |
 | `lumiqot service status worker --json` | 8 seconds | Report Worker intent, actual state, and health. |
-| `lumiqot lifecycle drain` | 900 seconds | Close admission and wait for active work. |
+| `lumiqot service enable gateway` | 60 seconds | Save the enabled preference and wait for Gateway readiness. |
+| `lumiqot service disable gateway` | 120 seconds | Save the disabled preference and stop the Gateway. |
+| `lumiqot service status gateway --json` | 8 seconds | Report Gateway intent, actual state, and health. |
+| `lumiqot lifecycle drain` | 900 seconds | Close Worker admission and wait for active jobs. Gateway drain returns immediately and leaves traffic flowing until stop. |
 | `lumiqot lifecycle stop` | 120 seconds | Drain and temporarily stop managed services. |
 | `lumiqot lifecycle start` | 60 seconds | Start and resume enabled services and converge disabled services to stopped. |
 | `lumiqot lifecycle restart` | 960 seconds | Temporarily stop services, then converge to their saved preferences. If stopping fails, attempt convergence in a separate 60-second recovery window. |
@@ -101,14 +105,14 @@ are point-in-time observations during a transaction.
 
 ### JSON status
 
-`service status worker --json` returns one service object. The same object
-appears under `services["lumiqot-worker.service"]` in lifecycle status.
+`service status worker --json` and `service status gateway --json` each return
+one service object. Lifecycle status indexes the same objects by unit name.
 
 - `desired` is `enabled`, `disabled`, or `unknown` when the preference cannot be read.
 - `actual` is `running`, `stopped`, `draining`, `failed`, or `partial` during a systemd transition.
 - `health` is `healthy`, `unhealthy`, `not_applicable` when stopped, or `unknown` when health cannot be determined. Running health checks local readiness and the executable paired with the active CLI.
 - `converged` compares intent with actual state independently of process health.
-- `load`, `systemd`, and `boot_enabled` describe the unit. `ready`, `draining`, and `active` report Worker admission and the active job count. `error` is included when a probe fails.
+- `load`, `systemd`, and `boot_enabled` describe the unit. `ready` reports service readiness. For Worker, `draining` and `active` report admission state and the active job count. `error` is included when a probe fails.
 
 Lifecycle status adds an aggregate `state` of `healthy`, `disabled`,
 `draining`, `stopped`, `failed`, or `partial`. Its `converged` means all
@@ -123,7 +127,7 @@ mutation deadline. See the Worker journal with
 ### Release and verification
 
 Use a Worker commit that implements `-control-socket` and `-drain-marker`
-when packaging either architecture. Publish a Manager with protocol 2
+and a Gateway commit that implements `drain` when packaging either architecture. Publish a Manager with protocol 2
 support before using the new package with WinApp. Use matching releases on a
 fresh WSL installation. The package manifest still uses archive format 1.
 

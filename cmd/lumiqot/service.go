@@ -23,6 +23,10 @@ var services = []managedService{{
 	name: "worker", unit: workerUnit, defaultEnabled: false,
 	status: workerReport, drain: drainWorker, stop: stopWorker, start: startWorker,
 	disarmBoot: disableWorkerBoot,
+}, {
+	name: "gateway", unit: gatewayUnit, defaultEnabled: false,
+	status: gatewayReport, drain: drainGateway, stop: func(ctx context.Context) error { return stopUnit(ctx, gatewayUnit) },
+	start: startGateway, disarmBoot: func(ctx context.Context) error { return disableUnitBoot(ctx, gatewayUnit) },
 }}
 
 type serviceStatus struct {

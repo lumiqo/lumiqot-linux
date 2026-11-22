@@ -2,8 +2,8 @@
 set -euo pipefail
 export GOWORK=off
 
-if [[ $# != 5 || ! $1 =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
-    echo "Usage: scripts/package.sh VERSION WORKER_REPO WORKER_COMMIT ALLINO_REPO ALLINO_COMMIT" >&2
+if [[ $# != 7 || ! $1 =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+    echo "Usage: scripts/package.sh VERSION WORKER_REPO WORKER_COMMIT ALLINO_REPO ALLINO_COMMIT GATEWAY_REPO GATEWAY_COMMIT" >&2
     exit 2
 fi
 version=$1
@@ -11,14 +11,17 @@ worker_repo=$(cd -- "$2" && pwd)
 worker_commit=$(git -C "$worker_repo" rev-parse --verify "$3^{commit}")
 allino_repo=$(cd -- "$4" && pwd)
 allino_commit=$(git -C "$allino_repo" rev-parse --verify "$5^{commit}")
+gateway_repo=$(cd -- "$6" && pwd)
+gateway_commit=$(git -C "$gateway_repo" rev-parse --verify "$7^{commit}")
 cd -- "$(dirname -- "$0")/.."
 repo=$PWD
 mkdir -p dist
 build_dir=$(mktemp -d)
 trap 'rm -rf -- "$build_dir"' EXIT
-mkdir -p "$build_dir/worker/.deps/allino"
+mkdir -p "$build_dir/worker/.deps/allino" "$build_dir/gateway"
 git -C "$worker_repo" archive "$worker_commit" | tar -x -C "$build_dir/worker"
 git -C "$allino_repo" archive "$allino_commit" | tar -x -C "$build_dir/worker/.deps/allino"
+git -C "$gateway_repo" archive "$gateway_commit" | tar -x -C "$build_dir/gateway"
 if [[ ! -f "$build_dir/worker/.deps/allino/job_queue.go" ]]; then
     (cd "$build_dir/worker/.deps/allino" && patch -p1 < "$build_dir/worker/patches/allino-sql-queue.patch")
 fi
@@ -37,6 +40,31 @@ if [[ $worker_help != *"-control-socket "* || $worker_help != *"-drain-marker "*
     exit 1
 fi
 
+if ! (
+    cd "$build_dir/gateway"
+    CGO_ENABLED=0 GOOS=linux GOARCH="$(go env GOHOSTARCH)" go run . drain
+); then
+    echo "Gateway commit $gateway_commit does not support the managed drain command" >&2
+    exit 1
+fi
+
+copy_module_licenses() (
+    target=$1
+    license_root=$2
+    go list -deps -f '{{with .Module}}{{if not .Main}}{{printf "%s\t%s" .Path .Dir}}{{end}}{{end}}' \
+        "$target" | sort -u > "$build_dir/modules"
+    shopt -s nullglob
+    while IFS=$'\t' read -r module directory; do
+        [[ -n "$module" ]] || continue
+        licenses=("$directory"/LICENSE* "$directory"/COPYING* "$directory"/NOTICE* "$directory"/PATENTS*)
+        if (( ${#licenses[@]} )); then
+            destination="$license_root/$module"
+            mkdir -p "$destination"
+            cp -- "${licenses[@]}" "$destination/"
+        fi
+    done < "$build_dir/modules"
+)
+
 for arch in amd64 arm64; do
     name="lumiqot-linux-${version}-linux-${arch}"
     package="$build_dir/$name"
@@ -48,18 +76,13 @@ for arch in amd64 arm64; do
         cd "$build_dir/worker"
         go build -trimpath -buildvcs=false -ldflags="-s -w" \
             -o "$package/libexec/lumiqot/lumiqo-worker" ./cmd/lumiqo-worker
-        go list -deps -f '{{with .Module}}{{if not .Main}}{{printf "%s\t%s" .Path .Dir}}{{end}}{{end}}' \
-            ./cmd/lumiqo-worker | sort -u > "$build_dir/modules"
-        shopt -s nullglob
-        while IFS=$'\t' read -r module directory; do
-            [[ -n "$module" ]] || continue
-            licenses=("$directory"/LICENSE* "$directory"/COPYING* "$directory"/NOTICE* "$directory"/PATENTS*)
-            if (( ${#licenses[@]} )); then
-                destination="$package/licenses/$module"
-                mkdir -p "$destination"
-                cp -- "${licenses[@]}" "$destination/"
-            fi
-        done < "$build_dir/modules"
+        copy_module_licenses ./cmd/lumiqo-worker "$package/licenses"
+    )
+    (
+        cd "$build_dir/gateway"
+        go build -trimpath -buildvcs=false -ldflags="-s -w" \
+            -o "$package/bin/lumiqo-gateway" .
+        copy_module_licenses . "$package/licenses/gateway"
     )
     mkdir -p "$package/licenses/go"
     go_root=$(go env GOROOT)

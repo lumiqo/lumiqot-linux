@@ -1,0 +1,19 @@
+[Unit]
+Description=Lumiqot Gateway
+After=network.target
+
+[Service]
+Type=exec
+WorkingDirectory=%h
+Environment=HOME=%h
+Environment=XDG_CONFIG_HOME=%h/.config
+Environment=PATH=/opt/lumiqo/environment/current/bin:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecCondition=/opt/lumiqo/distribution/current/bin/lumiqot service check-enabled gateway
+ExecStart=/opt/lumiqo/distribution/current/bin/lumiqo-gateway start
+KillMode=mixed
+TimeoutStopSec=30s
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=default.target

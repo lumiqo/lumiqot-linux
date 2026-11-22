@@ -19,7 +19,7 @@ const usage = `Usage:
   lumiqot service {enable|disable|status} SERVICE [--timeout SECONDS] [--json]
   lumiqot lifecycle {drain|stop|start|restart|status} [--timeout SECONDS] [--json]
 
-Services: worker (disabled by default)
+Services: worker, gateway (both disabled by default)
 Service enable and disable save intent. Lifecycle commands preserve intent.
 Use --json with status.
 `

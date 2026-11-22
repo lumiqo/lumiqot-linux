@@ -17,13 +17,26 @@ func TestUserSystemdBootCondition(t *testing.T) {
 		t.Fatal("XDG_RUNTIME_DIR must point to the running user session")
 	}
 
+	for _, test := range []struct {
+		service  managedService
+		unitFile []byte
+	}{
+		{services[0], workerUnitFile},
+		{services[1], gatewayUnitFile},
+	} {
+		t.Run(test.service.name, func(t *testing.T) {
+			checkUserSystemdBootCondition(t, runtime, test.service, test.unitFile)
+		})
+	}
+}
+
+func checkUserSystemdBootCondition(t *testing.T, runtime string, service managedService, unitFile []byte) {
 	dir := t.TempDir()
 	binary := filepath.Join(dir, "lumiqot")
 	if out, err := exec.Command("go", "build", "-o", binary, ".").CombinedOutput(); err != nil {
 		t.Fatalf("build CLI: %v: %s", err, out)
 	}
 	t.Setenv("HOME", dir)
-	service := services[0]
 	unitDir := filepath.Join(runtime, "systemd", "user")
 	if err := os.MkdirAll(unitDir, 0700); err != nil {
 		t.Fatal(err)
@@ -48,7 +61,7 @@ func TestUserSystemdBootCondition(t *testing.T) {
 	})
 
 	var condition string
-	for _, line := range strings.Split(string(workerUnitFile), "\n") {
+	for _, line := range strings.Split(string(unitFile), "\n") {
 		if strings.HasPrefix(line, "ExecCondition=") {
 			condition = strings.Replace(line, packageRoot+"/current/bin/lumiqot", binary, 1)
 			break

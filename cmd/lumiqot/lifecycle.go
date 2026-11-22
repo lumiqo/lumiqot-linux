@@ -214,7 +214,11 @@ type unitState struct {
 }
 
 func workerState(ctx context.Context) (unitState, error) {
-	out, err := systemctl(ctx, "show", "-p", "LoadState,ActiveState,UnitFileState,MainPID,ControlGroup", "--", workerUnit)
+	return readUnitState(ctx, workerUnit)
+}
+
+func readUnitState(ctx context.Context, unit string) (unitState, error) {
+	out, err := systemctl(ctx, "show", "-p", "LoadState,ActiveState,UnitFileState,MainPID,ControlGroup", "--", unit)
 	fields := map[string]string{}
 	for _, line := range strings.Split(out, "\n") {
 		key, value, ok := strings.Cut(line, "=")
@@ -237,8 +241,12 @@ func workerState(ctx context.Context) (unitState, error) {
 }
 
 func verifyWorkerExecutable(pid int) error {
+	return verifyServiceExecutable(pid, "Worker", "../libexec/lumiqot/lumiqo-worker")
+}
+
+func verifyServiceExecutable(pid int, name, relativePath string) error {
 	if pid <= 0 {
-		return errors.New("systemd returned no Worker PID")
+		return fmt.Errorf("systemd returned no %s PID", name)
 	}
 	running, err := os.Readlink(fmt.Sprintf("/proc/%d/exe", pid))
 	if err != nil {
@@ -248,9 +256,9 @@ func verifyWorkerExecutable(pid int) error {
 	if err != nil {
 		return err
 	}
-	expected := filepath.Join(filepath.Dir(cli), "..", "libexec/lumiqot/lumiqo-worker")
+	expected := filepath.Join(filepath.Dir(cli), relativePath)
 	if running != expected {
-		return fmt.Errorf("running Worker %q differs from %q", running, expected)
+		return fmt.Errorf("running %s %q differs from %q", name, running, expected)
 	}
 	return nil
 }
@@ -400,37 +408,45 @@ func stopWorker(ctx context.Context) error {
 	if err := drainWorker(ctx); err != nil {
 		return err
 	}
-	state, err := workerState(ctx)
+	return stopUnit(ctx, workerUnit)
+}
+
+func stopUnit(ctx context.Context, unit string) error {
+	state, err := readUnitState(ctx, unit)
 	if err != nil || state.load == "not-found" {
 		return err
 	}
 	if state.active != "inactive" {
-		if _, err := systemctl(ctx, "stop", "--", workerUnit); err != nil {
+		if _, err := systemctl(ctx, "stop", "--", unit); err != nil {
 			return err
 		}
 		if err := waitFor(ctx, func() (bool, error) {
-			state, err := workerState(ctx)
+			state, err := readUnitState(ctx, unit)
 			return (state.active == "inactive" || state.active == "failed") && state.pid == 0, err
 		}); err != nil {
 			return err
 		}
 	}
 	if err := waitFor(ctx, func() (bool, error) { return emptyControlGroup(state.cgroup) }); err != nil {
-		return fmt.Errorf("wait for %s process group: %w", workerUnit, err)
+		return fmt.Errorf("wait for %s process group: %w", unit, err)
 	}
-	state, err = workerState(ctx)
+	state, err = readUnitState(ctx, unit)
 	if err == nil && state.active == "failed" {
-		_, err = systemctl(ctx, "reset-failed", "--", workerUnit)
+		_, err = systemctl(ctx, "reset-failed", "--", unit)
 	}
 	return err
 }
 
 func disableWorkerBoot(ctx context.Context) error {
-	state, err := workerState(ctx)
+	return disableUnitBoot(ctx, workerUnit)
+}
+
+func disableUnitBoot(ctx context.Context, unit string) error {
+	state, err := readUnitState(ctx, unit)
 	if err != nil || state.load == "not-found" || state.enabled == "disabled" {
 		return err
 	}
-	_, err = systemctl(ctx, "disable", "--", workerUnit)
+	_, err = systemctl(ctx, "disable", "--", unit)
 	return err
 }
 
@@ -459,7 +475,7 @@ func emptyControlGroup(group string) (bool, error) {
 	return false, errors.New("systemd control group has no populated flag")
 }
 
-func registerWorker(ctx context.Context) error {
+func registerUnit(ctx context.Context, unit string, contents []byte) error {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return err
@@ -469,12 +485,12 @@ func registerWorker(ctx context.Context) error {
 		configDir = filepath.Join(home, ".config")
 	}
 	dir := filepath.Join(configDir, "systemd", "user")
-	path := filepath.Join(dir, workerUnit)
+	path := filepath.Join(dir, unit)
 	existing, err := os.ReadFile(path)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
-	if string(existing) != string(workerUnitFile) {
+	if string(existing) != string(contents) {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return err
 		}
@@ -483,7 +499,7 @@ func registerWorker(ctx context.Context) error {
 			return err
 		}
 		defer os.Remove(file.Name())
-		_, writeErr := file.Write(workerUnitFile)
+		_, writeErr := file.Write(contents)
 		if err := errors.Join(writeErr, file.Chmod(0644), file.Close()); err != nil {
 			return err
 		}
@@ -495,35 +511,48 @@ func registerWorker(ctx context.Context) error {
 	return err
 }
 
-func startWorker(ctx context.Context) error {
-	if err := registerWorker(ctx); err != nil {
+func startUnit(ctx context.Context, name string, contents []byte) error {
+	if err := registerUnit(ctx, name, contents); err != nil {
 		return err
 	}
-	unit, err := workerState(ctx)
+	state, err := readUnitState(ctx, name)
 	if err != nil {
 		return err
 	}
-	if unit.active == "failed" {
+	if state.active == "failed" {
 		// A failed previous candidate shares this unit's start-rate counter.
 		// An inactive unit can be unloaded by systemd before reset-failed runs.
-		if _, err := systemctl(ctx, "reset-failed", "--", workerUnit); err != nil {
+		if _, err := systemctl(ctx, "reset-failed", "--", name); err != nil {
 			return err
 		}
 	}
-	if _, err := systemctl(ctx, "start", "--", workerUnit); err != nil {
-		return err
-	}
-	if err := waitFor(ctx, func() (bool, error) {
-		state, err := workerState(ctx)
+	_, err = systemctl(ctx, "start", "--", name)
+	return err
+}
+
+func waitForUnitReady(ctx context.Context, unit string, ready func(context.Context, unitState) (bool, error)) error {
+	return waitFor(ctx, func() (bool, error) {
+		state, err := readUnitState(ctx, unit)
 		if err != nil {
 			return false, err
 		}
-		if state.active == "failed" || state.active == "inactive" {
-			return false, fmt.Errorf("%s became %s; see journalctl --user -u %s", workerUnit, state.active, workerUnit)
-		}
-		if state.active != "active" {
+		switch state.active {
+		case "failed", "inactive":
+			return false, fmt.Errorf("%s became %s; see journalctl --user -u %s", unit, state.active, unit)
+		case "active":
+			return ready(ctx, state)
+		default:
 			return false, nil
 		}
+	})
+}
+
+func startWorker(ctx context.Context) error {
+	if err := startUnit(ctx, workerUnit, workerUnitFile); err != nil {
+		return err
+	}
+
+	if err := waitForUnitReady(ctx, workerUnit, func(ctx context.Context, _ unitState) (bool, error) {
 		control, err := controlWorker(ctx, http.MethodGet, "status")
 		return err == nil && control.Ready, nil
 	}); err != nil {
@@ -531,7 +560,7 @@ func startWorker(ctx context.Context) error {
 	}
 	// Confirm the service is running the binary paired with this CLI before
 	// enabling admission. In particular, a stale PID cannot satisfy readiness.
-	unit, err = workerState(ctx)
+	unit, err := workerState(ctx)
 	if err != nil {
 		return err
 	}
