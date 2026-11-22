@@ -1,0 +1,17 @@
+[Unit]
+Description=Lumiqot Librarian
+
+[Service]
+Type=exec
+WorkingDirectory=%h
+RuntimeDirectory=lumiqot-librarian
+RuntimeDirectoryMode=0700
+Environment=HOME=%h
+Environment=PATH=/opt/lumiqo/environment/current/bin:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecCondition=/opt/lumiqo/distribution/current/bin/lumiqot service check-enabled librarian
+ExecStart=/opt/lumiqo/distribution/current/libexec/lumiqot/lumiqo-librarian serve "-unix-socket=%t/lumiqot-librarian/mcp.sock"
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=default.target

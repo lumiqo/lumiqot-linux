@@ -17,9 +17,10 @@ const usage = `Usage:
   lumiqot version
   lumiqot codex-bridge
   lumiqot service {enable|disable|status} SERVICE [--timeout SECONDS] [--json]
+  lumiqot service manifest
   lumiqot lifecycle {drain|stop|start|restart|status} [--timeout SECONDS] [--json]
 
-Services: worker, gateway (both disabled by default)
+Services: worker, librarian, gateway (disabled by default)
 Service enable and disable save intent. Lifecycle commands preserve intent.
 Use --json with status.
 `

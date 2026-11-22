@@ -22,7 +22,8 @@ func TestUserSystemdBootCondition(t *testing.T) {
 		unitFile []byte
 	}{
 		{services[0], workerUnitFile},
-		{services[1], gatewayUnitFile},
+		{services[1], librarianUnitFile},
+		{services[2], gatewayUnitFile},
 	} {
 		t.Run(test.service.name, func(t *testing.T) {
 			checkUserSystemdBootCondition(t, runtime, test.service, test.unitFile)

@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "services": [
+    {
+      "id": "worker",
+      "endpoints": [
+        {
+          "id": "worker.github-webhook",
+          "socket": "lumiqot-worker/webhook.sock",
+          "path": "/hooks/github",
+          "methods": ["POST"],
+          "auth": "github-webhook"
+        }
+      ]
+    },
+    {
+      "id": "librarian",
+      "endpoints": [
+        {
+          "id": "librarian.mcp",
+          "socket": "lumiqot-librarian/mcp.sock",
+          "path": "/mcp",
+          "methods": ["GET", "POST", "DELETE"],
+          "auth": "bearer"
+        }
+      ]
+    },
+    {
+      "id": "gateway",
+      "endpoints": []
+    }
+  ]
+}

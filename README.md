@@ -1,21 +1,46 @@
 # Lumiqot Linux distribution
 
-Build the Linux CLI with the bundled Worker and Gateway. Worker, Allino, and
-Gateway inputs come from explicit Git commits and can use private repositories.
+Build the Linux CLI with the bundled Worker, Librarian, and Gateway. Worker, Allino,
+Gateway, and Librarian inputs come from explicit Git commits and can use private repositories.
 The release contains binaries and dependency licenses.
 
 ```sh
 go test ./...
 scripts/package.sh v1.2.3 /path/to/worker WORKER_COMMIT /path/to/allino ALLINO_COMMIT \
-    /path/to/gateway GATEWAY_COMMIT
+    /path/to/gateway GATEWAY_COMMIT /path/to/librarian LIBRARIAN_COMMIT
 ```
 
 Build on Linux with Go 1.26 or newer, Python 3.11 or newer, Git, tar, and patch.
-The script archives the three input commits, builds for Linux amd64 and arm64,
+The script archives the four input commits, builds for Linux amd64 and arm64,
 and generates two tarballs and a shared SHA256SUMS asset in `dist/`. Publish all
 three assets together in the stable GitHub release for that exact tag. Manager installs the archive and owns
 the active symlink. The installed Gateway is available at
 `/opt/lumiqo/distribution/current/bin/lumiqo-gateway`. Gateway configuration is prepared separately from package installation.
+
+## Managed service endpoints
+
+Run `lumiqot service manifest` to inspect the bundled `services.json`. Socket
+paths are relative to the user manager's runtime directory. Initialize the
+Librarian store with the bundled `libexec/lumiqot/lumiqo-librarian init` before
+running `lumiqot service enable librarian`. Its normal per-user store is used.
+
+Explicitly enable each desired route in the Gateway YAML. For example,
+
+```yaml
+routes:
+  - path: /librarian/mcp
+    endpoint: librarian.mcp
+    auth: bearer
+    secret_files:
+      - /absolute/path/to/librarian-key
+```
+
+The Gateway forwards this exact public path to Librarian's `/mcp` over its
+private socket. Use `endpoint: worker.github-webhook` with
+`auth: github-webhook`, a webhook secret file, and the event, repository ID, and
+installation ID allowlists to forward verified deliveries to Worker. Gateway
+returns HTTP 503 if Worker cannot accept a delivery. Worker reconciles with
+GitHub during periodic polling.
 
 ## Package format 1
 
@@ -61,7 +86,7 @@ and extended attributes are ignored. Lifecycle protocol 2 is required by the mat
 ## Service management and lifecycle protocol 2
 
 Run these commands as the service user (`lumiqo`) in its systemd user
-session. Worker and Gateway are **disabled by default**. Configure each service
+session. Worker, Librarian, and Gateway are **disabled by default**. Configure each service
 and its credentials before enabling it. The managed Gateway reads
 `$HOME/.config/lumiqo-gateway/gateway.yaml`, which you can create using the
 bundled Gateway's `init` command.
@@ -71,6 +96,9 @@ bundled Gateway's `init` command.
 | `lumiqot service enable worker` | 60 seconds | Save the enabled preference, start and verify the Worker, and resume admission. |
 | `lumiqot service disable worker` | 120 seconds | Save the disabled preference, drain in-flight work, and stop the Worker. |
 | `lumiqot service status worker --json` | 8 seconds | Report Worker intent, actual state, and health. |
+| `lumiqot service enable librarian` | 60 seconds | Save the enabled preference and wait for the Librarian MCP socket. |
+| `lumiqot service disable librarian` | 120 seconds | Save the disabled preference and stop the Librarian. |
+| `lumiqot service status librarian --json` | 8 seconds | Report Librarian intent, actual state, and health. |
 | `lumiqot service enable gateway` | 60 seconds | Save the enabled preference and wait for Gateway readiness. |
 | `lumiqot service disable gateway` | 120 seconds | Save the disabled preference and stop the Gateway. |
 | `lumiqot service status gateway --json` | 8 seconds | Report Gateway intent, actual state, and health. |
@@ -105,8 +133,8 @@ are point-in-time observations during a transaction.
 
 ### JSON status
 
-`service status worker --json` and `service status gateway --json` each return
-one service object. Lifecycle status indexes the same objects by unit name.
+`service status <service> --json` returns one service object. Lifecycle status
+indexes the same objects by service ID.
 
 - `desired` is `enabled`, `disabled`, or `unknown` when the preference cannot be read.
 - `actual` is `running`, `stopped`, `draining`, `failed`, or `partial` during a systemd transition.

@@ -63,7 +63,11 @@ func drainGateway(ctx context.Context) error {
 }
 
 func gatewayReport(ctx context.Context) serviceStatus {
-	state, err := readUnitState(ctx, gatewayUnit)
+	return unitReport(ctx, gatewayUnit, gatewayReady)
+}
+
+func unitReport(ctx context.Context, unit string, ready func(context.Context, unitState) (bool, error)) serviceStatus {
+	state, err := readUnitState(ctx, unit)
 	report := serviceStatus{Actual: "failed", Health: "unknown", Load: state.load, Systemd: state.active,
 		BootEnabled: state.enabled == "enabled"}
 	if err == nil {
@@ -74,7 +78,7 @@ func gatewayReport(ctx context.Context) serviceStatus {
 			report.Health = "unhealthy"
 		case "active":
 			report.Actual, report.Health = "running", "unhealthy"
-			report.Ready, err = gatewayReady(ctx, state)
+			report.Ready, err = ready(ctx, state)
 			if report.Ready {
 				report.Health = "healthy"
 			}

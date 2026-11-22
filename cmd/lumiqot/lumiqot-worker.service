@@ -4,13 +4,14 @@ After=network.target
 
 [Service]
 WorkingDirectory=%h
-RuntimeDirectory=lumiqot
+RuntimeDirectory=lumiqot lumiqot-worker
 RuntimeDirectoryMode=0700
 RuntimeDirectoryPreserve=restart
 Environment=HOME=%h
 Environment=PATH=/opt/lumiqo/environment/current/bin:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
 ExecCondition=/opt/lumiqo/distribution/current/bin/lumiqot service check-enabled worker
-ExecStart=/opt/lumiqo/distribution/current/bin/lumiqot run-worker -mode poll "-config=%h/.config/lumiqot/worker.json" "-control-socket=%t/lumiqot/control.sock" "-drain-marker=%t/lumiqot/drained"
+ExecStartPre=/usr/bin/rm -f -- %t/lumiqot-worker/webhook.sock
+ExecStart=/opt/lumiqo/distribution/current/bin/lumiqot run-worker -mode poll "-config=%h/.config/lumiqot/worker.json" "-control-socket=%t/lumiqot/control.sock" "-drain-marker=%t/lumiqot/drained" "-webhook-socket=%t/lumiqot-worker/webhook.sock"
 KillMode=mixed
 SendSIGKILL=no
 TimeoutStopSec=infinity
