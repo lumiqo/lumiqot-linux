@@ -18,6 +18,8 @@ const usage = `Usage:
   lumiqot github-cli set-account-type LOGIN {personal|work|ai}
   lumiqot version
   lumiqot codex-bridge
+  lumiqot worker fetch-all [--config FILE]
+  lumiqot worker push-all [--config FILE] [--dry-run]
   lumiqot service {enable|disable|status} SERVICE [--timeout SECONDS] [--json]
   lumiqot service manifest
   lumiqot gateway route list
@@ -78,8 +80,48 @@ func run(args []string) error {
 		return lifecycle(args[1:])
 	case len(args) > 0 && args[0] == "run-worker":
 		return workerExec(args[1:])
+	case len(args) > 0 && args[0] == "worker":
+		return workerCommand(args[1:])
 	}
 	return fmt.Errorf("%w: unknown command; see lumiqot --help", errUsage)
+}
+
+func workerCommand(args []string) error {
+	if slices.Equal(args, []string{"--help"}) || slices.Equal(args, []string{"-h"}) {
+		fmt.Print("Usage:\n  lumiqot worker fetch-all [--config FILE]\n  lumiqot worker push-all [--config FILE] [--dry-run]\n")
+		return nil
+	}
+	if len(args) == 0 || (args[0] != "fetch-all" && args[0] != "push-all") {
+		return fmt.Errorf("%w: see lumiqot worker --help", errUsage)
+	}
+	mode := args[0]
+	flags := flag.NewFlagSet("worker "+mode, flag.ContinueOnError)
+	config := flags.String("config", "", "Worker configuration file (default ~/.config/lumiqot/worker.json)")
+	var dryRun bool
+	if mode == "push-all" {
+		flags.BoolVar(&dryRun, "dry-run", false, "preview push candidates")
+	}
+	if err := flags.Parse(args[1:]); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return err
+		}
+		return fmt.Errorf("%w: %v", errUsage, err)
+	}
+	if flags.NArg() != 0 {
+		return fmt.Errorf("%w: unexpected arguments for worker %s", errUsage, mode)
+	}
+	if *config == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return err
+		}
+		*config = filepath.Join(home, ".config", "lumiqot", "worker.json")
+	}
+	workerArgs := []string{"-mode", mode, "-config", *config}
+	if dryRun {
+		workerArgs = append(workerArgs, "-dry-run")
+	}
+	return workerExec(workerArgs)
 }
 
 func workerExec(args []string) error {

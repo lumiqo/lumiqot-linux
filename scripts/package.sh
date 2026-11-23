@@ -56,6 +56,10 @@ if [[ $worker_help != *"-control-socket "* || $worker_help != *"-drain-marker "*
     echo "Worker source $worker_ref does not support the managed control socket, webhook socket and drain marker" >&2
     exit 1
 fi
+if [[ $worker_help != *fetch-all* || $worker_help != *push-all* || $worker_help != *"-dry-run "* ]]; then
+    echo "Worker source $worker_ref does not support fetch-all and push-all with dry-run" >&2
+    exit 1
+fi
 
 if ! librarian_help=$(
     cd "$build_dir/librarian"

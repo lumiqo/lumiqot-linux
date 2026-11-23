@@ -40,6 +40,22 @@ Remove that line before editing the template. Templates can use
 Template errors are reported in `agentsError` and leave the previous
 `AGENTS.md` in place.
 
+## Worker maintenance
+
+Run the bundled Worker maintenance commands as the Worker user.
+
+```sh
+lumiqot worker fetch-all
+lumiqot worker push-all --dry-run
+lumiqot worker push-all
+```
+
+`fetch-all` updates the GitHub tracking refs of managed repositories.
+`push-all` publishes unpublished `main` commits recorded by Worker, and
+`--dry-run` previews the candidates. Both commands print per-repository
+results as JSON. They use `~/.config/lumiqot/worker.json` by default.
+Use `--config FILE` for a separately configured Worker.
+
 ## Managed service endpoints
 
 Run `lumiqot service manifest` to inspect the bundled `services.json`. Socket
