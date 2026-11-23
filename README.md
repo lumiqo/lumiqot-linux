@@ -17,6 +17,22 @@ three assets together in the stable GitHub release for that exact tag. Manager i
 the active symlink. The installed Gateway is available at
 `/opt/lumiqo/distribution/current/bin/lumiqo-gateway`. Gateway configuration is prepared separately from package installation.
 
+## Settings overview
+
+Run `lumiqot status --json` as the managed Linux user to refresh the settings
+overview. The command writes `~/.cache/lumiqot/status.json` with the latest
+`components`, the snapshot before the last detected change in `previous`,
+and the component names that changed in `changedComponents`. Identical
+collections update the collection time and retain the last change. The report
+includes Gateway connectivity, SSH public keys, and selected Worker settings.
+
+Package activation installs `~/.config/lumiqot/AGENTS-template.md` and
+`~/.codex/AGENTS-Lumiqot-README.md` if they are missing. A status refresh
+renders the template to `~/.codex/AGENTS.md`. Templates can use
+`.GitHubSignedIn` and `.Gateway`, whose fields are `.LocalPort` and `.Service`.
+Template errors are reported in `agentsError` and leave the previous
+`AGENTS.md` in place.
+
 ## Managed service endpoints
 
 Run `lumiqot service manifest` to inspect the bundled `services.json`. Socket

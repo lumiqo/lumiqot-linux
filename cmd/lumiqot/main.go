@@ -14,6 +14,7 @@ import (
 var version = "dev"
 
 const usage = `Usage:
+  lumiqot status [--json]
   lumiqot version
   lumiqot codex-bridge
   lumiqot service {enable|disable|status} SERVICE [--timeout SECONDS] [--json]
@@ -47,6 +48,8 @@ func run(args []string) error {
 	case slices.Equal(args, []string{"version"}), slices.Equal(args, []string{"--version"}):
 		fmt.Println(version)
 		return nil
+	case slices.Equal(args, []string{"status"}), slices.Equal(args, []string{"status", "--json"}):
+		return collectStatus()
 	case slices.Equal(args, []string{"codex-bridge"}):
 		return codexBridge()
 	case slices.Equal(args, []string{"service", "--help"}), slices.Equal(args, []string{"lifecycle", "--help"}):

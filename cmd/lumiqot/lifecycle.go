@@ -75,6 +75,16 @@ func lifecycle(args []string) error {
 		return nil
 	}
 	return mutate(append([]string{"lifecycle"}, args...), *timeout, func(ctx context.Context) error {
+		// Manager activates a new distribution by running lifecycle start as its user.
+		if action == "start" && os.Getenv("LUMIQOT_MANAGER_TRANSACTION") == "1" {
+			home, err := os.UserHomeDir()
+			if err != nil {
+				return err
+			}
+			if err := installAgentsFiles(home); err != nil {
+				return err
+			}
+		}
 		var result error
 		for _, s := range services {
 			var err error

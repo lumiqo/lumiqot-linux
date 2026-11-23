@@ -19,3 +19,5 @@ documents/
 
 # Distribution and lifecycle reference
 !/README.md
+!/cmd/lumiqot/AGENTS-template.md
+!/cmd/lumiqot/AGENTS-Lumiqot-README.md
