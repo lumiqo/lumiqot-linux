@@ -25,6 +25,7 @@ type agentsGateway struct {
 
 type agentsTemplateData struct {
 	GitHubSignedIn bool
+	GitHubCLI      *githubCLIAccount
 	Gateway        *agentsGateway
 }
 
@@ -32,9 +33,36 @@ func agentsTemplatePath(home string) string {
 	return filepath.Join(home, ".config", "lumiqot", "AGENTS-template.md")
 }
 
+const agentsUpdateMarker = "{{/* LUMIQOT-AUTO-UPDATE:"
+
+func syncAgentsTemplate(path string) ([]byte, error) {
+	data, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		if err := writeAgentsFile(path, defaultAgentsTemplate, false); err != nil {
+			return nil, err
+		}
+		data, err = os.ReadFile(path)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if bytes.Equal(data, defaultAgentsTemplate) {
+		return data, nil
+	}
+
+	firstLine, _, _ := bytes.Cut(data, []byte("\n"))
+	if !bytes.HasPrefix(firstLine, []byte(agentsUpdateMarker)) {
+		return data, nil
+	}
+	if err := writeAgentsFile(path, defaultAgentsTemplate, true); err != nil {
+		return nil, err
+	}
+	return defaultAgentsTemplate, nil
+}
+
 func installAgentsFiles(home string) error {
-	if err := writeAgentsFile(agentsTemplatePath(home), defaultAgentsTemplate, false); err != nil {
-		return fmt.Errorf("install AGENTS template: %w", err)
+	if _, err := syncAgentsTemplate(agentsTemplatePath(home)); err != nil {
+		return fmt.Errorf("sync AGENTS template: %w", err)
 	}
 	path := filepath.Join(home, ".codex", "AGENTS-Lumiqot-README.md")
 	if err := writeAgentsFile(path, agentsReadme, false); err != nil {
@@ -45,12 +73,9 @@ func installAgentsFiles(home string) error {
 
 func updateAgents(home string, components map[string]json.RawMessage) error {
 	path := agentsTemplatePath(home)
-	if err := writeAgentsFile(path, defaultAgentsTemplate, false); err != nil {
-		return fmt.Errorf("install AGENTS template: %w", err)
-	}
-	data, err := os.ReadFile(path)
+	data, err := syncAgentsTemplate(path)
 	if err != nil {
-		return err
+		return fmt.Errorf("sync AGENTS template: %w", err)
 	}
 	source, err := template.New(filepath.Base(path)).Parse(string(data))
 	if err != nil {
@@ -77,6 +102,13 @@ func agentsData(components map[string]json.RawMessage) agentsTemplateData {
 	}
 	_ = json.Unmarshal(components["auth"], &auth)
 	data := agentsTemplateData{GitHubSignedIn: auth.Value["gh"] == "signed_in"}
+	var github struct {
+		Value *githubCLIAccount
+	}
+	if err := json.Unmarshal(components["githubCli"], &github); err == nil && github.Value != nil &&
+		githubLoginPattern.MatchString(github.Value.Login) && validGitHubAccountType(github.Value.AccountType) {
+		data.GitHubCLI = github.Value
+	}
 
 	var gateway struct {
 		Value struct {

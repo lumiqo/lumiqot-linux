@@ -15,6 +15,7 @@ var version = "dev"
 
 const usage = `Usage:
   lumiqot status [--json]
+  lumiqot github-cli set-account-type LOGIN {personal|work|ai}
   lumiqot version
   lumiqot codex-bridge
   lumiqot service {enable|disable|status} SERVICE [--timeout SECONDS] [--json]
@@ -49,7 +50,12 @@ func run(args []string) error {
 		fmt.Println(version)
 		return nil
 	case slices.Equal(args, []string{"status"}), slices.Equal(args, []string{"status", "--json"}):
-		return collectStatus()
+		return collectStatus(nil)
+	case len(args) == 4 && args[0] == "github-cli" && args[1] == "set-account-type":
+		if !githubLoginPattern.MatchString(args[2]) || !validGitHubAccountType(args[3]) {
+			return errUsage
+		}
+		return collectStatus(&githubCLIAccount{Login: args[2], AccountType: args[3]})
 	case slices.Equal(args, []string{"codex-bridge"}):
 		return codexBridge()
 	case slices.Equal(args, []string{"service", "--help"}), slices.Equal(args, []string{"lifecycle", "--help"}):

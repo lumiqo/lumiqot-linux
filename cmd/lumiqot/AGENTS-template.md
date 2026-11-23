@@ -1,5 +1,13 @@
+{{/* LUMIQOT-AUTO-UPDATE: This template is updated automatically. Remove this line before editing to keep your changes. */ -}}
 # Lumiqot environment
-{{ if .GitHubSignedIn }}
+{{ if .GitHubCLI }}
+- The `gh` CLI is signed in as `{{ .GitHubCLI.Login }}` ({{ if eq .GitHubCLI.AccountType "ai" }}AI-dedicated account{{ else }}{{ .GitHubCLI.AccountType }} account{{ end }}).
+{{- if eq .GitHubCLI.AccountType "work" }}
+- Do not commit, push, or perform similar Git operations unless the user has explicitly requested that specific operation.
+{{- else if eq .GitHubCLI.AccountType "ai" }}
+- Unless instructed otherwise, commit your changes as you go so your work is preserved.
+{{- end }}
+{{- else if .GitHubSignedIn }}
 - The `gh` CLI is signed in.
 {{- end }}
 {{ if .Gateway }}

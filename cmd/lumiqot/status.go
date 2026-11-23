@@ -31,7 +31,7 @@ type statusHistory struct {
 	ChangedComponents []string        `json:"changedComponents"`
 }
 
-func collectStatus() error {
+func collectStatus(change *githubCLIAccount) error {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return err
@@ -58,10 +58,24 @@ func collectStatus() error {
 		return err
 	}
 
+	var changedAccount *githubCLIAccount
+	if change != nil {
+		changedAccount, err = githubCLIStatus(ctx, home, change)
+		if err != nil {
+			return err
+		}
+	}
+
 	config := filepath.Join(home, ".config", "lumiqot", "worker.json")
 	manager := "/opt/lumiqo/manager/current/lumiqo-manager"
 	workerSettings, settingsErr := readStatusWorkerSettings(config)
 	probes := map[string]func() (any, error){
+		"githubCli": func() (any, error) {
+			if changedAccount != nil {
+				return changedAccount, nil
+			}
+			return githubCLIStatus(ctx, home, nil)
+		},
 		"githubApp":        func() (any, error) { return statusGitHubApp(home, config) },
 		"updater":          func() (any, error) { return statusUpdater(ctx) },
 		"manager":          func() (any, error) { return statusManager(ctx, manager, config) },
@@ -117,7 +131,7 @@ func collectStatus() error {
 	if err := updateAgents(home, components); err != nil {
 		history.AgentsError = err.Error()
 	}
-	if err := writeStatusCache(dir, name, history); err != nil {
+	if err := writeStatusJSON(dir, name, history); err != nil {
 		return err
 	}
 	return json.NewEncoder(os.Stdout).Encode(history)
@@ -141,7 +155,7 @@ func statusChanges(previous, current map[string]json.RawMessage) []string {
 	return changes
 }
 
-func writeStatusCache(dir, name string, history statusHistory) error {
+func writeStatusJSON(dir, name string, value any) error {
 	file, err := os.CreateTemp(dir, ".status-*.json")
 	if err != nil {
 		return err
@@ -149,7 +163,7 @@ func writeStatusCache(dir, name string, history statusHistory) error {
 	defer os.Remove(file.Name())
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "  ")
-	writeErr := encoder.Encode(history)
+	writeErr := encoder.Encode(value)
 	if err := errors.Join(writeErr, file.Close()); err != nil {
 		return err
 	}

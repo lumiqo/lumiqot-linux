@@ -72,3 +72,66 @@ func TestAgentsFilesAndStatusRendering(t *testing.T) {
 		t.Fatalf("invalid template did not preserve existing instructions: %v", err)
 	}
 }
+
+func TestAgentsGitHubAccountInstructions(t *testing.T) {
+	home := t.TempDir()
+	for _, test := range []struct {
+		accountType string
+		label       string
+		blocksGit   bool
+		commits     bool
+	}{
+		{"personal", "personal account", false, false},
+		{"work", "work account", true, false},
+		{"ai", "AI-dedicated account", false, true},
+	} {
+		t.Run(test.accountType, func(t *testing.T) {
+			components := map[string]json.RawMessage{
+				"githubCli": json.RawMessage(`{"value":{"login":"fixture-user","accountType":"` + test.accountType + `"}}`),
+			}
+			if err := updateAgents(home, components); err != nil {
+				t.Fatal(err)
+			}
+			output, err := os.ReadFile(filepath.Join(home, ".codex", "AGENTS.md"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := string(output)
+			if !strings.Contains(got, "`fixture-user` ("+test.label+")") ||
+				strings.Contains(got, "Do not commit, push") != test.blocksGit ||
+				strings.Contains(got, "commit your changes as you go") != test.commits {
+				t.Fatalf("unexpected account instructions: %q", got)
+			}
+		})
+	}
+}
+
+func TestAgentsTemplateAutoUpdate(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		old  string
+		want string
+	}{
+		{"managed", agentsUpdateMarker + " previous release */ -}}\nOld instructions\n", string(defaultAgentsTemplate)},
+		{"marker removed", "# Custom instructions\n", "# Custom instructions\n"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			home := t.TempDir()
+			path := agentsTemplatePath(home)
+			if err := writeAgentsFile(path, []byte(test.old), false); err != nil {
+				t.Fatal(err)
+			}
+			if err := updateAgents(home, nil); err != nil {
+				t.Fatal(err)
+			}
+			data, err := os.ReadFile(path)
+			if err != nil || string(data) != test.want {
+				t.Fatalf("template = %q (%v), want %q", data, err, test.want)
+			}
+			output, err := os.ReadFile(filepath.Join(home, ".codex", "AGENTS.md"))
+			if err != nil || strings.Contains(string(output), "LUMIQOT-AUTO-UPDATE") {
+				t.Fatalf("generated instructions = %q (%v)", output, err)
+			}
+		})
+	}
+}

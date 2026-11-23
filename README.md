@@ -24,12 +24,19 @@ overview. The command writes `~/.cache/lumiqot/status.json` with the latest
 `components`, the snapshot before the last detected change in `previous`,
 and the component names that changed in `changedComponents`. Identical
 collections update the collection time and retain the last change. The report
-includes Gateway connectivity, SSH public keys, and selected Worker settings.
+includes Gateway connectivity, SSH public keys, selected Worker settings, and
+the active GitHub CLI login and account type. Account types are stored per
+GitHub login in `~/.config/lumiqot/github-cli.json` and default to personal.
+Use `lumiqot github-cli set-account-type LOGIN personal|work|ai` to save a
+classification and refresh the status cache.
 
 Package activation installs `~/.config/lumiqot/AGENTS-template.md` and
 `~/.codex/AGENTS-Lumiqot-README.md` if they are missing. A status refresh
-renders the template to `~/.codex/AGENTS.md`. Templates can use
-`.GitHubSignedIn` and `.Gateway`, whose fields are `.LocalPort` and `.Service`.
+renders the template to `~/.codex/AGENTS.md`. Lumiqot replaces templates
+that begin with the `LUMIQOT-AUTO-UPDATE` comment with the bundled version.
+Remove that line before editing the template. Templates can use
+`.GitHubSignedIn`, `.GitHubCLI` (with `.Login` and `.AccountType`), and
+`.Gateway` (with `.LocalPort` and `.Service`).
 Template errors are reported in `agentsError` and leave the previous
 `AGENTS.md` in place.
 
