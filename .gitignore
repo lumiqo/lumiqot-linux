@@ -21,3 +21,4 @@ documents/
 !/README.md
 !/cmd/lumiqot/AGENTS-template.md
 !/cmd/lumiqot/AGENTS-Lumiqot-README.md
+!/skills/*/SKILL.md

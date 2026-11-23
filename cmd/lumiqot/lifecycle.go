@@ -76,13 +76,17 @@ func lifecycle(args []string) error {
 	}
 	return mutate(append([]string{"lifecycle"}, args...), *timeout, func(ctx context.Context) error {
 		// Manager activates a new distribution by running lifecycle start as its user.
-		if action == "start" && os.Getenv("LUMIQOT_MANAGER_TRANSACTION") == "1" {
+		managed := os.Getenv("LUMIQOT_MANAGER_TRANSACTION") == "1"
+		if action == "start" && managed {
 			home, err := os.UserHomeDir()
 			if err != nil {
 				return err
 			}
 			if err := installAgentsFiles(home); err != nil {
 				return err
+			}
+			if err := syncBundledSkills(home, packageRoot, true); err != nil {
+				return fmt.Errorf("register bundled skills: %w", err)
 			}
 		}
 		var result error
@@ -92,7 +96,7 @@ func lifecycle(args []string) error {
 			case "drain":
 				err = s.drain(ctx)
 			case "stop":
-				if os.Getenv("LUMIQOT_MANAGER_TRANSACTION") == "1" {
+				if managed {
 					// Disarm automatic starts before switching the current link.
 					err = s.disarmBoot(ctx)
 				}
@@ -113,6 +117,15 @@ func lifecycle(args []string) error {
 			}
 			if err != nil {
 				result = errors.Join(result, fmt.Errorf("%s: %w", s.name, err))
+			}
+		}
+		if result == nil && action == "stop" && managed {
+			home, err := os.UserHomeDir()
+			if err != nil {
+				return err
+			}
+			if err := syncBundledSkills(home, packageRoot, false); err != nil {
+				return fmt.Errorf("unregister bundled skills: %w", err)
 			}
 		}
 		return result

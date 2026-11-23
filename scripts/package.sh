@@ -147,6 +147,7 @@ for arch in amd64 arm64; do
     cp cmd/lumiqot/services.json "$package/services.json"
     mkdir -p "$package/share/lumiqot"
     cp cmd/lumiqot/AGENTS-template.md cmd/lumiqot/AGENTS-Lumiqot-README.md "$package/share/lumiqot/"
+    cp -a skills "$package/share/lumiqot/"
     mkdir -p "$package/licenses/go"
     go_root=$(go env GOROOT)
     if [[ -f "$go_root/LICENSE" ]]; then

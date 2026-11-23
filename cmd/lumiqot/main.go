@@ -20,6 +20,15 @@ const usage = `Usage:
   lumiqot codex-bridge
   lumiqot service {enable|disable|status} SERVICE [--timeout SECONDS] [--json]
   lumiqot service manifest
+  lumiqot gateway route list
+  lumiqot gateway route add --path PATH --auth POLICY [OPTIONS]
+  lumiqot gateway route remove PATH
+  lumiqot gateway domain list
+  lumiqot gateway domain add --host HOST --upstream URL --auth public [--route-host HOST]
+  lumiqot gateway domain remove --host HOST
+  lumiqot gateway api-key list
+  lumiqot gateway api-key issue --name NAME [--path PATH]
+  lumiqot gateway api-key delete --name NAME
   lumiqot lifecycle {drain|stop|start|restart|status} [--timeout SECONDS] [--json]
 
 Services: worker, librarian, gateway (disabled by default)
@@ -61,6 +70,8 @@ func run(args []string) error {
 	case slices.Equal(args, []string{"service", "--help"}), slices.Equal(args, []string{"lifecycle", "--help"}):
 		fmt.Print(usage)
 		return nil
+	case len(args) > 0 && args[0] == "gateway":
+		return gatewayCLI(args[1:])
 	case len(args) > 0 && args[0] == "service":
 		return serviceCommand(args[1:])
 	case len(args) > 0 && args[0] == "lifecycle":

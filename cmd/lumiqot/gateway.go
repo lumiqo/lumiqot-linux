@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 )
 
 //go:embed lumiqot-gateway.service
@@ -17,17 +18,10 @@ const gatewayUnit = "lumiqot-gateway.service"
 const gatewayBinary = "lumiqo-gateway"
 
 func gatewayCommand(ctx context.Context, action string) (bool, error) {
-	cli, err := os.Readlink("/proc/self/exe")
+	cmd, err := newGatewayCommand(ctx, action)
 	if err != nil {
 		return false, err
 	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return false, err
-	}
-	cmd := exec.CommandContext(ctx, filepath.Join(filepath.Dir(cli), gatewayBinary), action)
-	// Match the user unit even when the caller has a custom XDG directory.
-	cmd.Env = append(os.Environ(), "XDG_CONFIG_HOME="+filepath.Join(home, ".config"))
 	data, err := cmd.Output()
 	if ctx.Err() != nil {
 		return false, ctx.Err()
@@ -108,4 +102,72 @@ func startGateway(ctx context.Context) error {
 	}
 	_, err := systemctl(ctx, "enable", "--", gatewayUnit)
 	return err
+}
+
+func newGatewayCommand(ctx context.Context, args ...string) (*exec.Cmd, error) {
+	cli, err := os.Readlink("/proc/self/exe")
+	if err != nil {
+		return nil, err
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil, err
+	}
+	cmd := exec.CommandContext(ctx, filepath.Join(filepath.Dir(cli), gatewayBinary), args...)
+	// Use the same configuration directory as the systemd user unit.
+	cmd.Env = append(os.Environ(), "XDG_CONFIG_HOME="+filepath.Join(home, ".config"))
+	return cmd, nil
+}
+
+func gatewayCLI(args []string) error {
+	if len(args) < 2 {
+		return fmt.Errorf("%w: see lumiqot --help", errUsage)
+	}
+	switch args[0] {
+	case "route":
+		switch args[1] {
+		case "list":
+			if len(args) != 2 {
+				return errUsage
+			}
+		case "add":
+		case "remove":
+			if len(args) != 3 {
+				return errUsage
+			}
+			args = []string{"route", "remove", "--path", args[2]}
+		default:
+			return errUsage
+		}
+	case "domain":
+		switch args[1] {
+		case "list":
+			if len(args) != 2 {
+				return errUsage
+			}
+		case "add", "remove":
+		default:
+			return errUsage
+		}
+	case "api-key":
+		switch args[1] {
+		case "list", "issue", "delete":
+		default:
+			return errUsage
+		}
+	default:
+		return errUsage
+	}
+	for _, arg := range args[2:] {
+		// The wrapper always targets the configuration used by systemd.
+		if arg == "-config" || arg == "--config" || strings.HasPrefix(arg, "-config=") || strings.HasPrefix(arg, "--config=") {
+			return fmt.Errorf("%w: --config is only available on the standalone Gateway", errUsage)
+		}
+	}
+	cmd, err := newGatewayCommand(context.Background(), args...)
+	if err != nil {
+		return err
+	}
+	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+	return cmd.Run()
 }

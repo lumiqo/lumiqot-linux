@@ -131,6 +131,49 @@ bundled Gateway's `init` command.
 | `lumiqot lifecycle restart` | 960 seconds | Temporarily stop services, then converge to their saved preferences. If stopping fails, attempt convergence in a separate 60-second recovery window. |
 | `lumiqot lifecycle status --json` | 8 seconds | Report aggregate and per-service status. |
 
+Manage public routes with the Gateway CLI wrapper. Commands return JSON.
+The secret file must already exist, contain the key, and be private to the
+Gateway user.
+
+```sh
+lumiqot gateway route list
+lumiqot gateway route add --path /mcp --auth bearer --endpoint librarian.mcp --secret-file /absolute/private/mcp-key
+lumiqot gateway route remove /mcp
+```
+
+For a local HTTP backend, use `--upstream http://127.0.0.1:9000` in place of
+`--endpoint`. A GitHub webhook route uses `--auth github-webhook` and requires
+`--event`, `--repository`, and `--installation`. Repeat each flag to allow
+multiple values. Bearer routes can repeat `--secret-file` for key rotation.
+
+The list includes saved and active routes and indicates whether they agree
+when Gateway is running. Add and remove apply to a running Gateway or save
+the validated configuration for the next start. Removal leaves secret files
+in place. The wrapper uses the same configuration file as the Gateway user
+service.
+
+To issue named API keys for a new Bearer route, enable managed keys when
+adding it. For an existing Bearer route, set `managed_api_keys: true` in
+the Gateway YAML and reload before issuing keys.
+
+```sh
+lumiqot gateway route add --path /mcp --auth bearer --endpoint librarian.mcp --managed-api-keys
+lumiqot gateway api-key issue --name my-client --path /mcp
+lumiqot gateway api-key issue --name global-client
+lumiqot gateway api-key list
+lumiqot gateway api-key delete --name my-client
+```
+
+Omit `--path` to issue a key for every Bearer route in this Gateway
+instance, including routes that use secret files. Global keys have
+an empty `path` in the list. GitHub webhook routes still require webhook
+signatures.
+
+Use `api_key.token` from the issue response as an `Authorization: Bearer`
+credential. The token is displayed only at issuance. The list shows the
+name, route, and UTC creation time. Deleting a key revokes it immediately
+when Gateway is running.
+
 Each service has a private preference file at
 `$HOME/.local/state/lumiqot/services/<service>`. The CLI writes it atomically
 as the service user. A missing file selects that service's documented default.
@@ -153,6 +196,26 @@ transaction reports the lock conflict and can be retried. If convergence fails o
 saved, the preference remains in effect and a later start or reconciliation
 retries convergence. The CLI never force-kills in-flight jobs. Status reads
 are point-in-time observations during a transaction.
+
+### Forward a hostname through Gateway
+
+```sh
+lumiqot gateway domain add --host app.example.net --upstream http://127.0.0.1:3000 --auth public
+lumiqot gateway domain list
+lumiqot gateway domain remove --host app.example.net
+```
+
+The first registration uses the hostname from Gateway's `public_url` for
+its existing path routes. If that URL is unset, pass `--route-host HOST` with
+the hostname or IP your path clients already use. Existing path routes
+continue to answer on that host, including after the last domain is removed.
+The forwarding rule is public. Any application login is handled by the
+upstream service.
+
+Package with a Gateway commit that provides `domain add/list/remove`.
+Use `local` or `home-relay` connectivity. Configure
+the public DNS, TLS, and ingress mapping separately. The ingress must preserve
+the request's Host header.
 
 ### JSON status
 
