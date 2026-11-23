@@ -124,6 +124,11 @@ func gatewayCLI(args []string) error {
 		return fmt.Errorf("%w: see lumiqot --help", errUsage)
 	}
 	switch args[0] {
+	case "worker-webhook":
+		if args[1] != "register" {
+			return errUsage
+		}
+		return registerWorkerWebhook(args[2:])
 	case "route":
 		switch args[1] {
 		case "list":

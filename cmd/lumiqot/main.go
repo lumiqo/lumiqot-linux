@@ -22,6 +22,7 @@ const usage = `Usage:
   lumiqot worker push-all [--config FILE] [--dry-run]
   lumiqot service {enable|disable|status} SERVICE [--timeout SECONDS] [--json]
   lumiqot service manifest
+  lumiqot gateway worker-webhook register --secret-file FILE --installation ID --repository ID [--repository ID ...]
   lumiqot gateway route list
   lumiqot gateway route add --path PATH --auth POLICY [OPTIONS]
   lumiqot gateway route remove PATH
