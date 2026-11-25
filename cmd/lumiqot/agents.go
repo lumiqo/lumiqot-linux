@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net"
 	"os"
 	"path/filepath"
 	"text/template"
@@ -17,17 +16,6 @@ var defaultAgentsTemplate []byte
 
 //go:embed AGENTS-Lumiqot-README.md
 var agentsReadme []byte
-
-type agentsGateway struct {
-	LocalPort string
-	Service   string
-}
-
-type agentsTemplateData struct {
-	GitHubSignedIn bool
-	GitHubCLI      *githubCLIAccount
-	Gateway        *agentsGateway
-}
 
 func agentsTemplatePath(home string) string {
 	return filepath.Join(home, ".config", "lumiqot", "AGENTS-template.md")
@@ -71,7 +59,7 @@ func installAgentsFiles(home string) error {
 	return nil
 }
 
-func updateAgents(home string, components map[string]json.RawMessage) error {
+func updateAgents(home string, status statusHistory) error {
 	path := agentsTemplatePath(home)
 	data, err := syncAgentsTemplate(path)
 	if err != nil {
@@ -81,8 +69,18 @@ func updateAgents(home string, components map[string]json.RawMessage) error {
 	if err != nil {
 		return err
 	}
+	// Decode the snapshot as JSON so templates see the same field names and
+	// value types as consumers of status.json.
+	raw, err := json.Marshal(status)
+	if err != nil {
+		return err
+	}
+	var templateData map[string]any
+	if err := json.Unmarshal(raw, &templateData); err != nil {
+		return err
+	}
 	var output bytes.Buffer
-	if err := source.Execute(&output, agentsData(components)); err != nil {
+	if err := source.Execute(&output, templateData); err != nil {
 		return err
 	}
 	path = filepath.Join(home, ".codex", "AGENTS.md")
@@ -94,55 +92,6 @@ func updateAgents(home string, components map[string]json.RawMessage) error {
 		return err
 	}
 	return writeAgentsFile(path, output.Bytes(), true)
-}
-
-func agentsData(components map[string]json.RawMessage) agentsTemplateData {
-	var auth struct {
-		Value map[string]string
-	}
-	_ = json.Unmarshal(components["auth"], &auth)
-	data := agentsTemplateData{GitHubSignedIn: auth.Value["gh"] == "signed_in"}
-	var github struct {
-		Value *githubCLIAccount
-	}
-	if err := json.Unmarshal(components["githubCli"], &github); err == nil && github.Value != nil &&
-		githubLoginPattern.MatchString(github.Value.Login) && validGitHubAccountType(github.Value.AccountType) {
-		data.GitHubCLI = github.Value
-	}
-
-	var gateway struct {
-		Value struct {
-			Config struct {
-				Listen       string
-				Connectivity struct {
-					Provider  string
-					PublicURL string `json:"public_url"`
-				}
-			}
-		}
-	}
-	if err := json.Unmarshal(components["gateway"], &gateway); err != nil {
-		return data
-	}
-	config := gateway.Value.Config
-	if config.Connectivity.PublicURL == "" {
-		return data
-	}
-	switch config.Connectivity.Provider {
-	case "local":
-		if _, port, err := net.SplitHostPort(config.Listen); err == nil && port != "" {
-			data.Gateway = &agentsGateway{LocalPort: port}
-		}
-	case "managed-tunnel":
-		data.Gateway = &agentsGateway{Service: "Cloudflare Named Tunnel"}
-	case "home-relay":
-		data.Gateway = &agentsGateway{Service: "Lumiqo Home Relay"}
-	default:
-		if config.Connectivity.Provider != "" {
-			data.Gateway = &agentsGateway{Service: config.Connectivity.Provider}
-		}
-	}
-	return data
 }
 
 func writeAgentsFile(path string, data []byte, replace bool) error {

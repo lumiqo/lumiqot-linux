@@ -13,10 +13,14 @@
 - Use `mise` for language runtime management.
 - `python-analysis` provides a preconfigured analysis environment.
 - See `~/docs/ENVIRONMENT.md` for installed packages, tool versions, and environment-specific instructions.
-{{- if .GitHubCLI }}
-- The `gh` CLI is signed in as `{{ .GitHubCLI.Login }}` ({{ if eq .GitHubCLI.AccountType "ai" }}AI-dedicated account{{ else }}{{ .GitHubCLI.AccountType }} account{{ end }}).
-{{- else if .GitHubSignedIn }}
+{{- with .components }}
+{{- if and .githubCli (eq .githubCli.state "available") .githubCli.value }}
+{{- with .githubCli.value }}
+- The `gh` CLI is signed in as `{{ .login }}` ({{ if eq .accountType "ai" }}AI-dedicated account{{ else }}{{ .accountType }} account{{ end }}).
+{{- end }}
+{{- else if and .auth (eq .auth.state "available") .auth.value (eq .auth.value.gh "signed_in") }}
 - The `gh` CLI is signed in.
+{{- end }}
 {{- end }}
 
 ## Public service hosting

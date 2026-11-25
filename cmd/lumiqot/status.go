@@ -128,7 +128,7 @@ func collectStatus(change *githubCLIAccount) error {
 			history.ChangedComponents = changes
 		}
 	}
-	if err := updateAgents(home, components); err != nil {
+	if err := updateAgents(home, history); err != nil {
 		history.AgentsError = err.Error()
 	}
 	if err := writeStatusJSON(dir, name, history); err != nil {

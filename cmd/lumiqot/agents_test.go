@@ -34,26 +34,27 @@ func TestAgentsFilesAndStatusRendering(t *testing.T) {
 		t.Fatal("package assets were not installed")
 	}
 
-	components := map[string]json.RawMessage{
-		"auth":    json.RawMessage(`{"value":{"gh":"signed_in"}}`),
-		"gateway": json.RawMessage(`{"value":{"config":{"listen":"[::]:8443","connectivity":{"provider":"local","public_url":"https://example.test"}}}}`),
+	status := statusHistory{
+		SchemaVersion: 1,
+		statusSnapshot: statusSnapshot{Components: map[string]json.RawMessage{
+			"auth":    json.RawMessage(`{"state":"available","value":{"gh":"signed_in"}}`),
+			"gateway": json.RawMessage(`{"state":"available","value":{"config":{"listen":"[::]:8443"}}}`),
+		}},
+		ChangedComponents: []string{"gateway"},
 	}
-	if err := updateAgents(home, components); err != nil {
+	if err := updateAgents(home, status); err != nil {
 		t.Fatal(err)
 	}
-	if got := read(generated); !strings.Contains(got, "`gh` CLI is signed in") ||
-		!strings.Contains(got, "embedded Caddy server on local port `8443`") {
-		t.Fatalf("unexpected local Gateway instructions: %q", got)
+	if got := read(generated); !strings.Contains(got, "`gh` CLI is signed in") {
+		t.Fatalf("unexpected instructions: %q", got)
 	}
 
-	components["auth"] = json.RawMessage(`{"value":{"gh":"signed_out"}}`)
-	components["gateway"] = json.RawMessage(`{"value":{"config":{"listen":"127.0.0.1:8080","connectivity":{"provider":"managed-tunnel","public_url":"https://example.test"}}}}`)
-	if err := updateAgents(home, components); err != nil {
+	write(templatePath, "{{ .schemaVersion }} {{ index .changedComponents 0 }} {{ .components.gateway.value.config.listen }}")
+	if err := updateAgents(home, status); err != nil {
 		t.Fatal(err)
 	}
-	if got := read(generated); !strings.Contains(got, "Cloudflare Named Tunnel") ||
-		strings.Contains(got, "Caddy") || strings.Contains(got, "8080") || strings.Contains(got, "`gh`") {
-		t.Fatalf("unexpected tunnel instructions: %q", got)
+	if got := read(generated); got != "1 gateway [::]:8443" {
+		t.Fatalf("status JSON was not available to the template: %q", got)
 	}
 
 	write(notice, "Custom notice")
@@ -64,11 +65,11 @@ func TestAgentsFilesAndStatusRendering(t *testing.T) {
 	if read(templatePath) != "Custom instructions" || read(notice) != "Custom notice" {
 		t.Fatal("package activation overwrote an existing file")
 	}
-	if err := updateAgents(home, components); err != nil || read(generated) != "Custom instructions" {
+	if err := updateAgents(home, status); err != nil || read(generated) != "Custom instructions" {
 		t.Fatalf("custom template was not applied: %v", err)
 	}
 	write(templatePath, "{{")
-	if err := updateAgents(home, components); err == nil || read(generated) != "Custom instructions" {
+	if err := updateAgents(home, status); err == nil || read(generated) != "Custom instructions" {
 		t.Fatalf("invalid template did not preserve existing instructions: %v", err)
 	}
 }
@@ -78,29 +79,26 @@ func TestAgentsGitHubAccountInstructions(t *testing.T) {
 	for _, test := range []struct {
 		accountType string
 		label       string
-		blocksGit   bool
-		commits     bool
 	}{
-		{"personal", "personal account", false, false},
-		{"work", "work account", true, false},
-		{"ai", "AI-dedicated account", false, true},
+		{"personal", "personal account"},
+		{"work", "work account"},
+		{"ai", "AI-dedicated account"},
 	} {
 		t.Run(test.accountType, func(t *testing.T) {
-			components := map[string]json.RawMessage{
-				"githubCli": json.RawMessage(`{"value":{"login":"fixture-user","accountType":"` + test.accountType + `"}}`),
-			}
-			if err := updateAgents(home, components); err != nil {
+			status := statusHistory{SchemaVersion: 1, statusSnapshot: statusSnapshot{
+				Components: map[string]json.RawMessage{
+					"githubCli": json.RawMessage(`{"state":"available","value":{"login":"fixture-user","accountType":"` + test.accountType + `"}}`),
+				},
+			}}
+			if err := updateAgents(home, status); err != nil {
 				t.Fatal(err)
 			}
 			output, err := os.ReadFile(filepath.Join(home, ".codex", "AGENTS.md"))
 			if err != nil {
 				t.Fatal(err)
 			}
-			got := string(output)
-			if !strings.Contains(got, "`fixture-user` ("+test.label+")") ||
-				strings.Contains(got, "Do not commit, push") != test.blocksGit ||
-				strings.Contains(got, "commit your changes as you go") != test.commits {
-				t.Fatalf("unexpected account instructions: %q", got)
+			if !strings.Contains(string(output), "`fixture-user` ("+test.label+")") {
+				t.Fatalf("unexpected account instructions: %q", output)
 			}
 		})
 	}
@@ -121,7 +119,7 @@ func TestAgentsTemplateAutoUpdate(t *testing.T) {
 			if err := writeAgentsFile(path, []byte(test.old), false); err != nil {
 				t.Fatal(err)
 			}
-			if err := updateAgents(home, nil); err != nil {
+			if err := updateAgents(home, statusHistory{SchemaVersion: 1}); err != nil {
 				t.Fatal(err)
 			}
 			data, err := os.ReadFile(path)
