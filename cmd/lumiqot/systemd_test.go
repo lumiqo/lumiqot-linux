@@ -23,7 +23,8 @@ func TestUserSystemdBootCondition(t *testing.T) {
 	}{
 		{services[0], workerUnitFile},
 		{services[1], librarianUnitFile},
-		{services[2], gatewayUnitFile},
+		{services[2], remoteUnitFile},
+		{services[3], gatewayUnitFile},
 	} {
 		t.Run(test.service.name, func(t *testing.T) {
 			checkUserSystemdBootCondition(t, runtime, test.service, test.unitFile)
@@ -91,7 +92,13 @@ func checkUserSystemdBootCondition(t *testing.T, runtime string, service managed
 			t.Fatalf("%s triggered ExecStart=%t, want %t (stat: %v)", action, err == nil, wanted, err)
 		}
 	}
-	checkStart("start", false)
+	checkStart("start", service.defaultEnabled)
+	if service.defaultEnabled {
+		run("stop", name)
+		if err := os.Remove(stamp); err != nil {
+			t.Fatal(err)
+		}
+	}
 	if err := service.setEnabled(true); err != nil {
 		t.Fatal(err)
 	}

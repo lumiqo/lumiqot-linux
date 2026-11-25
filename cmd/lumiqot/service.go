@@ -30,12 +30,20 @@ var services = manifestServices(map[string]managedService{
 		disarmBoot: disableWorkerBoot,
 	},
 	"librarian": {
-		name: "librarian", unit: librarianUnit,
+		name: "librarian", unit: librarianUnit, defaultEnabled: true,
 		status:     func(ctx context.Context) serviceStatus { return unitReport(ctx, librarianUnit, librarianReady) },
 		drain:      func(context.Context) error { return nil },
 		stop:       func(ctx context.Context) error { return stopUnit(ctx, librarianUnit) },
 		start:      startLibrarian,
 		disarmBoot: func(ctx context.Context) error { return disableUnitBoot(ctx, librarianUnit) },
+	},
+	"remote": {
+		name: "remote", unit: remoteUnit, defaultEnabled: true,
+		status:     func(ctx context.Context) serviceStatus { return unitReport(ctx, remoteUnit, remoteReady) },
+		drain:      func(context.Context) error { return nil },
+		stop:       func(ctx context.Context) error { return stopUnit(ctx, remoteUnit) },
+		start:      startRemote,
+		disarmBoot: func(ctx context.Context) error { return disableUnitBoot(ctx, remoteUnit) },
 	},
 	"gateway": {
 		name: "gateway", unit: gatewayUnit,

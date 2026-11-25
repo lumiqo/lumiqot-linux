@@ -26,6 +26,18 @@
       ]
     },
     {
+      "id": "remote",
+      "endpoints": [
+        {
+          "id": "remote.mcp",
+          "socket": "lumiqot-remote/mcp.sock",
+          "path": "/mcp",
+          "methods": ["GET", "POST", "DELETE"],
+          "auth": "bearer"
+        }
+      ]
+    },
+    {
       "id": "gateway",
       "endpoints": []
     }

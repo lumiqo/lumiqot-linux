@@ -1,0 +1,18 @@
+[Unit]
+Description=Lumiqot Remote
+
+[Service]
+Type=exec
+WorkingDirectory=%h
+RuntimeDirectory=lumiqot-remote
+RuntimeDirectoryMode=0700
+Environment=HOME=%h
+Environment=PATH=/opt/lumiqo/environment/current/bin:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecCondition=/opt/lumiqo/distribution/current/bin/lumiqot service check-enabled remote
+ExecStart=/opt/lumiqo/distribution/current/libexec/lumiqot/lumiqo-remote "-unix-socket=%t/lumiqot-remote/mcp.sock"
+TimeoutStopSec=30s
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=default.target

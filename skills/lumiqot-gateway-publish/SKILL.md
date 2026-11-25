@@ -45,10 +45,10 @@ To register the bundled GitHub Issue Worker at `/hooks/github`, use its dedicate
 
 ```sh
 lumiqot gateway worker-webhook register --secret-file /absolute/private/github-webhook-secret \
-  --installation 456 --repository 123
+  --installation 456
 ```
 
-Use `lumiqot gateway route add` with an exact `--path`, `--auth github-webhook`, and an absolute, owner-only `--secret-file` containing the secret configured in GitHub. Supply the permitted `--event`, numeric `--repository`, and numeric `--installation` values. Those flags can be repeated. For delivery to a bundled endpoint, use its manifest ID with `--endpoint`. Gateway checks the `X-Hub-Signature-256` signature on the POST body and all three allowlists. Verify the route with a real delivery for an allowed event. Bearer API keys apply only to Bearer routes.
+Use `lumiqot gateway route add` with an exact `--path`, `--auth github-webhook`, and an absolute, owner-only `--secret-file` containing the secret configured in GitHub. Supply the permitted `--event` and numeric `--installation` values. Those flags can be repeated. For delivery to a bundled endpoint, use its manifest ID with `--endpoint`. Gateway checks the `X-Hub-Signature-256` signature on the POST body and the event and installation allowlists. The route covers all repositories in each permitted installation. Verify the route with a real delivery for an allowed event. Bearer API keys apply only to Bearer routes.
 
 ## Forward a public hostname
 

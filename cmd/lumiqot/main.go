@@ -22,19 +22,20 @@ const usage = `Usage:
   lumiqot worker push-all [--config FILE] [--dry-run]
   lumiqot service {enable|disable|status} SERVICE [--timeout SECONDS] [--json]
   lumiqot service manifest
-  lumiqot gateway worker-webhook register --secret-file FILE --installation ID --repository ID [--repository ID ...]
+  lumiqot gateway worker-webhook register --secret-file FILE --installation ID
   lumiqot gateway route list
   lumiqot gateway route add --path PATH --auth POLICY [OPTIONS]
   lumiqot gateway route remove PATH
   lumiqot gateway domain list
   lumiqot gateway domain add --host HOST --upstream URL --auth public [--route-host HOST]
   lumiqot gateway domain remove --host HOST
+  lumiqot gateway pairing issue
   lumiqot gateway api-key list
   lumiqot gateway api-key issue --name NAME [--path PATH]
   lumiqot gateway api-key delete --name NAME
   lumiqot lifecycle {drain|stop|start|restart|status} [--timeout SECONDS] [--json]
 
-Services: worker, librarian, gateway (disabled by default)
+Services: worker, librarian, remote, gateway (librarian and remote enabled by default)
 Service enable and disable save intent. Lifecycle commands preserve intent.
 Use --json with status.
 `

@@ -2,8 +2,8 @@
 set -euo pipefail
 export GOWORK=off
 
-if [[ $# != 9 || ! $1 =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
-    echo "Usage: scripts/package.sh VERSION WORKER_REPO WORKER_COMMIT ALLINO_REPO ALLINO_COMMIT GATEWAY_REPO GATEWAY_COMMIT LIBRARIAN_REPO LIBRARIAN_COMMIT" >&2
+if [[ $# != 11 || ! $1 =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+    echo "Usage: scripts/package.sh VERSION WORKER_REPO WORKER_COMMIT ALLINO_REPO ALLINO_COMMIT GATEWAY_REPO GATEWAY_COMMIT LIBRARIAN_REPO LIBRARIAN_COMMIT REMOTE_REPO REMOTE_COMMIT" >&2
     exit 2
 fi
 version=$1
@@ -15,13 +15,15 @@ gateway_repo=$(cd -- "$6" && pwd)
 gateway_ref=$7
 librarian_repo=$(cd -- "$8" && pwd)
 librarian_ref=$9
+remote_repo=$(cd -- "${10}" && pwd)
+remote_ref=${11}
 cd -- "$(dirname -- "$0")/.."
 output=${LUMIQOT_PACKAGE_OUTPUT:-"$PWD/dist"}
 mkdir -p -- "$output"
 output=$(realpath -- "$output")
 build_dir=$(mktemp -d)
 trap 'rm -rf -- "$build_dir"' EXIT
-mkdir -p "$build_dir/worker/.deps/allino" "$build_dir/gateway" "$build_dir/librarian"
+mkdir -p "$build_dir/worker/.deps/allino" "$build_dir/gateway" "$build_dir/librarian" "$build_dir/remote"
 copy_source() {
     local repo=$1 ref=$2 destination=$3 commit
     if [[ $ref == WORKTREE ]]; then
@@ -39,6 +41,7 @@ copy_source "$worker_repo" "$worker_ref" "$build_dir/worker"
 git -C "$allino_repo" archive "$allino_commit" | tar -x -C "$build_dir/worker/.deps/allino"
 copy_source "$gateway_repo" "$gateway_ref" "$build_dir/gateway"
 copy_source "$librarian_repo" "$librarian_ref" "$build_dir/librarian"
+copy_source "$remote_repo" "$remote_ref" "$build_dir/remote"
 if [[ ! -f "$build_dir/worker/.deps/allino/job_queue.go" ]]; then
     (cd "$build_dir/worker/.deps/allino" && patch -p1 < "$build_dir/worker/patches/allino-sql-queue.patch")
 fi
@@ -56,7 +59,8 @@ if [[ $worker_help != *"-control-socket "* || $worker_help != *"-drain-marker "*
     echo "Worker source $worker_ref does not support the managed control socket, webhook socket and drain marker" >&2
     exit 1
 fi
-if [[ $worker_help != *fetch-all* || $worker_help != *push-all* || $worker_help != *"-dry-run "* ]]; then
+dry_run_flag='(^|[[:space:]])-dry-run([[:space:]]|$)'
+if [[ $worker_help != *fetch-all* || $worker_help != *push-all* || ! $worker_help =~ $dry_run_flag ]]; then
     echo "Worker source $worker_ref does not support fetch-all and push-all with dry-run" >&2
     exit 1
 fi
@@ -73,6 +77,18 @@ if [[ $librarian_help != *"-unix-socket "* ]]; then
     exit 1
 fi
 
+if ! remote_help=$(
+    cd "$build_dir/remote"
+    CGO_ENABLED=0 GOOS=linux GOARCH="$(go env GOHOSTARCH)" go run ./cmd/lumiqo-remote -help 2>&1
+); then
+    printf '%s\n' "$remote_help" >&2
+    exit 1
+fi
+if [[ $remote_help != *"-unix-socket "* ]]; then
+    echo "Remote source $remote_ref does not support the managed socket" >&2
+    exit 1
+fi
+
 # Check that the pinned Gateway can resolve routes from the packaged manifest.
 check_dir="$build_dir/check"
 mkdir -p "$check_dir/bin"
@@ -86,12 +102,16 @@ routes:
     endpoint: worker.github-webhook
     auth: github-webhook
     events: [issues, issue_comment]
-    repositories: [1]
     installations: [1]
     secret_files:
       - "$check_dir/key"
   - path: /librarian-mcp
     endpoint: librarian.mcp
+    auth: bearer
+    secret_files:
+      - "$check_dir/key"
+  - path: /remote-mcp
+    endpoint: remote.mcp
     auth: bearer
     secret_files:
       - "$check_dir/key"
@@ -147,6 +167,12 @@ for arch in amd64 arm64; do
         go build -trimpath -buildvcs=false -ldflags="-s -w" \
             -o "$package/libexec/lumiqot/lumiqo-librarian" .
         copy_module_licenses . "$package/licenses/librarian"
+    )
+    (
+        cd "$build_dir/remote"
+        go build -trimpath -buildvcs=false -ldflags="-s -w" \
+            -o "$package/libexec/lumiqot/lumiqo-remote" ./cmd/lumiqo-remote
+        copy_module_licenses ./cmd/lumiqo-remote "$package/licenses/remote"
     )
     cp cmd/lumiqot/services.json "$package/services.json"
     mkdir -p "$package/share/lumiqot"

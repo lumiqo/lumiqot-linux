@@ -13,7 +13,14 @@
 *.pptx
 *.xls
 *.xlsx
-docs/
+docs/*
+!/docs/.nojekyll
+!/docs/index.html
+!/docs/guides/
+/docs/guides/*
+!/docs/guides/chatgpt-ios/
+/docs/guides/chatgpt-ios/*
+!/docs/guides/chatgpt-ios/mcp/
 doc/
 documents/
 

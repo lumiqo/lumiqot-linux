@@ -1,17 +1,18 @@
 # Lumiqot Linux distribution
 
-Build the Linux CLI with the bundled Worker, Librarian, and Gateway. Worker, Allino,
-Gateway, and Librarian inputs come from explicit Git commits and can use private repositories.
+Build the Linux CLI with the bundled Worker, Librarian, Remote, and Gateway. Worker, Allino,
+Gateway, Librarian, and Remote inputs come from explicit Git commits and can use private repositories.
 The release contains binaries and dependency licenses.
 
 ```sh
 go test ./...
 scripts/package.sh v1.2.3 /path/to/worker WORKER_COMMIT /path/to/allino ALLINO_COMMIT \
-    /path/to/gateway GATEWAY_COMMIT /path/to/librarian LIBRARIAN_COMMIT
+    /path/to/gateway GATEWAY_COMMIT /path/to/librarian LIBRARIAN_COMMIT \
+    /path/to/remote REMOTE_COMMIT
 ```
 
 Build on Linux with Go 1.26 or newer, Python 3.11 or newer, Git, tar, and patch.
-The script archives the four input commits, builds for Linux amd64 and arm64,
+The script archives the five input commits, builds for Linux amd64 and arm64,
 and generates two tarballs and a shared SHA256SUMS asset in `dist/`. Publish all
 three assets together in the stable GitHub release for that exact tag. Manager installs the archive and owns
 the active symlink. The installed Gateway is available at
@@ -59,9 +60,8 @@ Use `--config FILE` for a separately configured Worker.
 ## Managed service endpoints
 
 Run `lumiqot service manifest` to inspect the bundled `services.json`. Socket
-paths are relative to the user manager's runtime directory. Initialize the
-Librarian store with the bundled `libexec/lumiqot/lumiqo-librarian init` before
-running `lumiqot service enable librarian`. Its normal per-user store is used.
+paths are relative to the user manager's runtime directory. Librarian uses its
+normal per-user store and initializes it at startup if needed.
 
 Explicitly enable each desired route in the Gateway YAML. For example,
 
@@ -125,8 +125,15 @@ and extended attributes are ignored. Lifecycle protocol 2 is required by the mat
 ## Service management and lifecycle protocol 2
 
 Run these commands as the service user (`lumiqo`) in its systemd user
-session. Worker, Librarian, and Gateway are **disabled by default**. Configure each service
-and its credentials before enabling it. The managed Gateway reads
+session. Librarian and Remote start automatically on first install. The defaults
+apply whenever a service has no saved preference. Explicit preferences survive
+updates. On first start, Librarian initializes its Git document store if needed.
+Remote's MCP socket is private to the service user. Bash execution requires
+systemd with cgroup v2 and passwordless sudo for that user. PDF extraction uses
+`pdftotext` from `poppler-utils`. Stopping or updating Remote stops active jobs.
+
+Worker and Gateway are disabled by default. Configure their credentials before
+enabling them. The managed Gateway reads
 `$HOME/.config/lumiqo-gateway/gateway.yaml`, which you can create using the
 bundled Gateway's `init` command.
 
@@ -138,6 +145,9 @@ bundled Gateway's `init` command.
 | `lumiqot service enable librarian` | 60 seconds | Save the enabled preference and wait for the Librarian MCP socket. |
 | `lumiqot service disable librarian` | 120 seconds | Save the disabled preference and stop the Librarian. |
 | `lumiqot service status librarian --json` | 8 seconds | Report Librarian intent, actual state, and health. |
+| `lumiqot service enable remote` | 60 seconds | Save the enabled preference and wait for the Remote MCP socket. |
+| `lumiqot service disable remote` | 120 seconds | Save the disabled preference and stop Remote and its jobs. |
+| `lumiqot service status remote --json` | 8 seconds | Report Remote intent, actual state, and health. |
 | `lumiqot service enable gateway` | 60 seconds | Save the enabled preference and wait for Gateway readiness. |
 | `lumiqot service disable gateway` | 120 seconds | Save the disabled preference and stop the Gateway. |
 | `lumiqot service status gateway --json` | 8 seconds | Report Gateway intent, actual state, and health. |
@@ -146,6 +156,10 @@ bundled Gateway's `init` command.
 | `lumiqot lifecycle start` | 60 seconds | Start and resume enabled services and converge disabled services to stopped. |
 | `lumiqot lifecycle restart` | 960 seconds | Temporarily stop services, then converge to their saved preferences. If stopping fails, attempt convergence in a separate 60-second recovery window. |
 | `lumiqot lifecycle status --json` | 8 seconds | Report aggregate and per-service status. |
+
+Gateway discovers `librarian.mcp` and `remote.mcp` through the package manifest.
+To publish Remote, create a bearer-authenticated route targeting `remote.mcp`.
+The route grants clients the service user's shell and filesystem access.
 
 Manage public routes with the Gateway CLI wrapper. Commands return JSON.
 The secret file must already exist, contain the key, and be private to the
@@ -159,8 +173,8 @@ lumiqot gateway route remove /mcp
 
 For a local HTTP backend, use `--upstream http://127.0.0.1:9000` in place of
 `--endpoint`. A GitHub webhook route uses `--auth github-webhook` and requires
-`--event`, `--repository`, and `--installation`. Repeat each flag to allow
-multiple values. Bearer routes can repeat `--secret-file` for key rotation.
+`--event` and `--installation`. Repeat either flag to allow multiple values.
+The route covers every repository in each allowed installation. Bearer routes can repeat `--secret-file` for key rotation.
 
 The list includes saved and active routes and indicates whether they agree
 when Gateway is running. Add and remove apply to a running Gateway or save
