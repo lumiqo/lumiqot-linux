@@ -12,7 +12,7 @@
 - Use `uv` for Python project dependencies.
 - Use `mise` for language runtime management.
 - `python-analysis` provides a preconfigured analysis environment.
-- See `~/docs/ENVIRONMENT.md` for installed packages, tool versions, and environment-specific instructions.
+- See `~/.local/share/lumiqot/docs/ENVIRONMENT.md` for installed packages, tool versions, and environment-specific instructions.
 {{- with .components }}
 {{- if and .githubCli (eq .githubCli.state "available") .githubCli.value }}
 {{- with .githubCli.value }}
