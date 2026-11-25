@@ -6,7 +6,7 @@
   <meta name="referrer" content="no-referrer">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src https:; form-action 'none'; base-uri 'none'">
   <meta name="theme-color" content="#14151a">
-  <title>Connect ChatGPT for iOS to Lumiqot · MCP Setup</title>
+  <title>Connect ChatGPT for iOS to Lumiqot · Remote MCP Setup</title>
   <link rel="stylesheet" href="./style.css">
   <script src="./copy.js" defer></script>
   <script src="./pairing.js" defer></script>
@@ -17,14 +17,14 @@
   </header>
   <main class="frame">
     <header class="intro">
-      <p class="subtitle">MCP Setup</p>
+      <p class="subtitle">Remote MCP Setup</p>
       <h1>Connect ChatGPT for iOS to Lumiqot</h1>
-      <p class="next-action">Use ChatGPT Sites to set up a private connector for Lumiqot. Once you install the connector in ChatGPT, you can use the ChatGPT app on your iPhone to access your Lumiqot MCP server.</p>
+      <p class="next-action">Use ChatGPT Sites to set up a private connector for Lumiqot. Once you install the connector in ChatGPT, you can use the ChatGPT app on your iPhone to access your Lumiqot Remote MCP server.</p>
     </header>
 
     <section id="pairing" aria-labelledby="pairing-title">
       <h2 id="pairing-title">Get your connection details</h2>
-      <p id="pairing-instructions">On your computer, open <strong>Lumiqot → Settings → MCP Sites</strong>, choose <strong>Show iPhone QR Code</strong>, and scan it with your iPhone camera.</p>
+      <p id="pairing-instructions">On your computer, open <strong>Lumiqot → Settings → Connect to Lumiqot Remote</strong>, choose <strong>Show iPhone QR Code</strong>, and scan it with your iPhone camera.</p>
       <button type="button" id="redeem-pairing" hidden>Get Connection Details</button>
       <p id="pairing-status" role="status" hidden></p>
       <div id="connection-details" hidden>
@@ -47,7 +47,7 @@
     <section aria-labelledby="admin">
       <h2 id="admin">1. Create a private setup page</h2>
       <p>Review the first prompt, adjust it if needed, and send it in a ChatGPT Work conversation.</p>
-      <pre><code id="first-prompt">Use ChatGPT Sites to create a private MCP connector that only I can access. First, create a private setup page where I can enter my Lumiqot MCP server URL and authorization token. Wait until I have entered both values before building the connector.</code></pre>
+      <pre><code id="first-prompt">Use ChatGPT Sites to create a private MCP connector that only I can access. First, create a private setup page where I can enter my Lumiqot Remote MCP server URL and authorization token. Wait until I have entered both values before building the connector.</code></pre>
       <div class="copy-row">
         <button type="button" data-copy="first-prompt" hidden>Copy First Prompt</button>
         <span class="copy-status" role="status"></span>
@@ -58,7 +58,7 @@
       <h2 id="connect">2. Enter your settings and build the connector</h2>
       <p>When the private setup page is ready, copy your server URL and authorization token from <a href="#pairing">Get your connection details</a> and enter them on the private setup page.</p>
       <p>Then send the second prompt in the same ChatGPT Work conversation.</p>
-      <pre><code id="second-prompt">Build the private MCP connector. Forward each incoming MCP request to the configured Lumiqot server URL and include the configured token in the Authorization header using the Bearer scheme. Store the token on the server and keep it out of client-side code. Verify that the Lumiqot server returns its tool list in response to tools/list. Then register the connector as "Lumiqot" and show me the installation screen.</code></pre>
+      <pre><code id="second-prompt">Build the private MCP connector. Forward each incoming MCP request to the configured Lumiqot Remote server URL and include the configured token in the Authorization header using the Bearer scheme. Store the token on the server and keep it out of client-side code. Verify that the Lumiqot Remote server returns its tool list in response to tools/list. Then register the connector as "Lumiqot" and show me the installation screen.</code></pre>
       <div class="copy-row">
         <button type="button" data-copy="second-prompt" hidden>Copy Second Prompt</button>
         <span class="copy-status" role="status"></span>
