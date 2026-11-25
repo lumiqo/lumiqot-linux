@@ -15,15 +15,7 @@
     },
     {
       "id": "librarian",
-      "endpoints": [
-        {
-          "id": "librarian.mcp",
-          "socket": "lumiqot-librarian/mcp.sock",
-          "path": "/mcp",
-          "methods": ["GET", "POST", "DELETE"],
-          "auth": "bearer"
-        }
-      ]
+      "endpoints": []
     },
     {
       "id": "remote",

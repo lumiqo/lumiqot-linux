@@ -60,22 +60,8 @@ Use `--config FILE` for a separately configured Worker.
 ## Managed service endpoints
 
 Run `lumiqot service manifest` to inspect the bundled `services.json`. Socket
-paths are relative to the user manager's runtime directory. Librarian uses its
-normal per-user store and initializes it at startup if needed.
-
-Explicitly enable each desired route in the Gateway YAML. For example,
-
-```yaml
-routes:
-  - path: /librarian/mcp
-    endpoint: librarian.mcp
-    auth: bearer
-    secret_files:
-      - /absolute/path/to/librarian-key
-```
-
-The Gateway forwards this exact public path to Librarian's `/mcp` over its
-private socket. Use `endpoint: worker.github-webhook` with
+paths are relative to the user manager's runtime directory. Use
+`endpoint: worker.github-webhook` with
 `auth: github-webhook`, a webhook secret file, and the event, repository ID, and
 installation ID allowlists to forward verified deliveries to Worker. Gateway
 returns HTTP 503 if Worker cannot accept a delivery. Worker reconciles with
@@ -127,7 +113,7 @@ and extended attributes are ignored. Lifecycle protocol 2 is required by the mat
 Run these commands as the service user (`lumiqo`) in its systemd user
 session. Librarian and Remote start automatically on first install. The defaults
 apply whenever a service has no saved preference. Explicit preferences survive
-updates. On first start, Librarian initializes its Git document store if needed.
+updates.
 Remote's MCP socket is private to the service user. Bash execution requires
 systemd with cgroup v2 and passwordless sudo for that user. PDF extraction uses
 `pdftotext` from `poppler-utils`. Stopping or updating Remote stops active jobs.
@@ -142,7 +128,7 @@ bundled Gateway's `init` command.
 | `lumiqot service enable worker` | 60 seconds | Save the enabled preference, start and verify the Worker, and resume admission. |
 | `lumiqot service disable worker` | 120 seconds | Save the disabled preference, drain in-flight work, and stop the Worker. |
 | `lumiqot service status worker --json` | 8 seconds | Report Worker intent, actual state, and health. |
-| `lumiqot service enable librarian` | 60 seconds | Save the enabled preference and wait for the Librarian MCP socket. |
+| `lumiqot service enable librarian` | 60 seconds | Save the enabled preference and wait for the Librarian process. |
 | `lumiqot service disable librarian` | 120 seconds | Save the disabled preference and stop the Librarian. |
 | `lumiqot service status librarian --json` | 8 seconds | Report Librarian intent, actual state, and health. |
 | `lumiqot service enable remote` | 60 seconds | Save the enabled preference and wait for the Remote MCP socket. |
@@ -157,7 +143,7 @@ bundled Gateway's `init` command.
 | `lumiqot lifecycle restart` | 960 seconds | Temporarily stop services, then converge to their saved preferences. If stopping fails, attempt convergence in a separate 60-second recovery window. |
 | `lumiqot lifecycle status --json` | 8 seconds | Report aggregate and per-service status. |
 
-Gateway discovers `librarian.mcp` and `remote.mcp` through the package manifest.
+Gateway discovers `remote.mcp` through the package manifest.
 To publish Remote, create a bearer-authenticated route targeting `remote.mcp`.
 The route grants clients the service user's shell and filesystem access.
 
@@ -167,7 +153,7 @@ Gateway user.
 
 ```sh
 lumiqot gateway route list
-lumiqot gateway route add --path /mcp --auth bearer --endpoint librarian.mcp --secret-file /absolute/private/mcp-key
+lumiqot gateway route add --path /mcp --auth bearer --endpoint remote.mcp --secret-file /absolute/private/mcp-key
 lumiqot gateway route remove /mcp
 ```
 
@@ -187,7 +173,7 @@ adding it. For an existing Bearer route, set `managed_api_keys: true` in
 the Gateway YAML and reload before issuing keys.
 
 ```sh
-lumiqot gateway route add --path /mcp --auth bearer --endpoint librarian.mcp --managed-api-keys
+lumiqot gateway route add --path /mcp --auth bearer --endpoint remote.mcp --managed-api-keys
 lumiqot gateway api-key issue --name my-client --path /mcp
 lumiqot gateway api-key issue --name global-client
 lumiqot gateway api-key list

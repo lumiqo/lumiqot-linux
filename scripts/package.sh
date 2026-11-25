@@ -65,18 +65,6 @@ if [[ $worker_help != *fetch-all* || $worker_help != *push-all* || ! $worker_hel
     exit 1
 fi
 
-if ! librarian_help=$(
-    cd "$build_dir/librarian"
-    CGO_ENABLED=0 GOOS=linux GOARCH="$(go env GOHOSTARCH)" go run . serve -help 2>&1
-); then
-    printf '%s\n' "$librarian_help" >&2
-    exit 1
-fi
-if [[ $librarian_help != *"-unix-socket "* ]]; then
-    echo "Librarian source $librarian_ref does not support the managed socket" >&2
-    exit 1
-fi
-
 if ! remote_help=$(
     cd "$build_dir/remote"
     CGO_ENABLED=0 GOOS=linux GOARCH="$(go env GOHOSTARCH)" go run ./cmd/lumiqo-remote -help 2>&1
@@ -105,11 +93,6 @@ routes:
     installations: [1]
     secret_files:
       - "$check_dir/key"
-  - path: /librarian-mcp
-    endpoint: librarian.mcp
-    auth: bearer
-    secret_files:
-      - "$check_dir/key"
   - path: /remote-mcp
     endpoint: remote.mcp
     auth: bearer
@@ -120,9 +103,11 @@ if ! (
     cd "$build_dir/gateway"
     CGO_ENABLED=0 GOOS=linux GOARCH="$(go env GOHOSTARCH)" go build -o "$check_dir/bin/lumiqo-gateway" .
     "$check_dir/bin/lumiqo-gateway" drain &&
-        XDG_RUNTIME_DIR=/run/user/1000 "$check_dir/bin/lumiqo-gateway" validate -config "$check_dir/gateway.yaml"
+        XDG_RUNTIME_DIR=/run/user/1000 "$check_dir/bin/lumiqo-gateway" validate -config "$check_dir/gateway.yaml" &&
+        "$check_dir/bin/lumiqo-gateway" init --bundled-routes -config "$check_dir/bundled-routes.yaml" &&
+        XDG_RUNTIME_DIR=/run/user/1000 "$check_dir/bin/lumiqo-gateway" validate -config "$check_dir/bundled-routes.yaml"
 ); then
-    echo "Gateway source $gateway_ref does not support the managed drain command or service endpoints" >&2
+    echo "Gateway source $gateway_ref does not support the managed drain command or bundled route setup" >&2
     exit 1
 fi
 
