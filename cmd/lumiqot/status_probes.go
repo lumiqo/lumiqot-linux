@@ -73,7 +73,15 @@ func statusSSHClient(ctx context.Context, home string) (any, error) {
 			}
 		}
 	}
-	return map[string]any{"publicKeys": keys}, nil
+	result := map[string]any{"publicKeys": keys}
+	verified, err := os.ReadFile(filepath.Join(home, ".ssh", ".lumiqot-windows-verified"))
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+	if at, err := time.Parse(time.RFC3339, strings.TrimSpace(string(verified))); err == nil {
+		result["windowsVerifiedAt"] = at.UTC().Format(time.RFC3339)
+	}
+	return result, nil
 }
 
 func statusGateway(ctx context.Context, home string) (any, error) {
