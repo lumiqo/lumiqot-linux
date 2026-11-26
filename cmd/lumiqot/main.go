@@ -18,6 +18,8 @@ const usage = `Usage:
   lumiqot github-cli set-account-type LOGIN {personal|work|ai}
   lumiqot version
   lumiqot codex-bridge
+  lumiqot ollama {status|install|start|stop|cancel}
+  lumiqot ollama {pull|delete|test} MODEL
   lumiqot worker fetch-all [--config FILE]
   lumiqot worker push-all [--config FILE] [--dry-run]
   lumiqot service {enable|disable|status} SERVICE [--timeout SECONDS] [--json]
@@ -30,6 +32,7 @@ const usage = `Usage:
   lumiqot gateway domain add --host HOST --upstream URL --auth public [--route-host HOST]
   lumiqot gateway domain remove --host HOST
   lumiqot gateway pairing issue
+  lumiqot gateway pairing check
   lumiqot gateway api-key list
   lumiqot gateway api-key issue --name NAME [--path PATH]
   lumiqot gateway api-key delete --name NAME
@@ -74,6 +77,8 @@ func run(args []string) error {
 	case slices.Equal(args, []string{"service", "--help"}), slices.Equal(args, []string{"lifecycle", "--help"}):
 		fmt.Print(usage)
 		return nil
+	case len(args) > 0 && args[0] == "ollama":
+		return ollamaCommand(args[1:])
 	case len(args) > 0 && args[0] == "gateway":
 		return gatewayCLI(args[1:])
 	case len(args) > 0 && args[0] == "service":

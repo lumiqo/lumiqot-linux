@@ -155,7 +155,7 @@ func gatewayCLI(args []string) error {
 			return errUsage
 		}
 	case "pairing":
-		if args[1] != "issue" || len(args) != 2 {
+		if (args[1] != "issue" && args[1] != "check") || len(args) != 2 {
 			return errUsage
 		}
 	case "api-key":

@@ -86,6 +86,7 @@ func collectStatus(change *githubCLIAccount) error {
 		"remote":           func() (any, error) { return statusRemote(ctx, home) },
 		"wslIpv4Addresses": func() (any, error) { return statusAddresses(ctx) },
 		"gateway":          func() (any, error) { return statusGateway(ctx, home) },
+		"ollama":           func() (any, error) { return ollamaStatus(ctx) },
 		"sshClient":        func() (any, error) { return statusSSHClient(ctx, home) },
 		"workerSettings":   func() (any, error) { return workerSettings, settingsErr },
 	}
